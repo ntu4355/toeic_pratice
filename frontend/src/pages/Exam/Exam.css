@@ -1,0 +1,82 @@
+.exam {
+  padding: 24px;
+}
+
+.exam h1 {
+  margin-bottom: 24px;
+  font-size: 28px;
+  color: #222;
+}
+
+.exam-list {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.exam-item {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.05);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 170px;
+}
+
+.exam-item h3 {
+  margin: 0 0 12px;
+  font-size: 20px;
+  color: #111;
+}
+
+.exam-item p {
+  margin: 4px 0;
+  color: #555;
+  line-height: 1.5;
+}
+
+.exam-link {
+  margin-top: 16px;
+  align-self: flex-start;
+  padding: 10px 18px;
+  border: none;
+  border-radius: 999px;
+  background: #0975ff;
+  color: #fff;
+  cursor: pointer;
+  transition:
+    transform 0.2s ease,
+    background 0.2s ease;
+}
+
+.exam-link:hover {
+  transform: translateY(-1px);
+  background: #0058d1;
+}
+
+@media (max-width: 1200px) {
+  .exam-list {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 992px) {
+  .exam-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .exam-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .exam-list {
+    grid-template-columns: 1fr;
+  }
+}
