@@ -2,7 +2,13 @@ import Navbar from "./components/Navbar/navbar";
 import Footer from "./components/Footer/footer";
 import Login from "./components/Login/login";
 import { useState, useEffect } from "react";
+import { Route, Routes } from "react-router-dom";
 import "./App.css";
+import Home from "./pages/Home/Home";
+import Vocab from "./pages/Vocab/Vocab";
+import Exam from "./pages/Exam/Exam";
+import Contact from "./pages/Contact/Contact";
+
 const App = () => {
   const [showLogin, setShowLogin] = useState(false);
   const [currentUser, setCurrentUser] = useState(() => {
@@ -36,8 +42,14 @@ const App = () => {
           currentUser={currentUser}
           setCurrentUser={setCurrentUser}
         />
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/vocab" element={<Vocab />} />
+          <Route path="/exam" element={<Exam />} />
+          <Route path="/contact" element={<Contact />} />
+        </Routes>
+        <Footer />
       </div>
-      <Footer />
     </>
   );
 };

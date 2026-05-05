@@ -1,0 +1,146 @@
+.vocab-page {
+  padding: 20px 0;
+}
+
+.vocab-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.vocab-container h1 {
+  text-align: center;
+  margin-bottom: 30px;
+  color: #0f4bcf;
+}
+
+.vocab-form {
+  background: #ffffff;
+  border: 1px solid rgba(15, 75, 207, 0.14);
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 30px;
+  box-shadow: 0 4px 12px rgba(15, 75, 207, 0.08);
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: #0f4bcf;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid rgba(15, 75, 207, 0.18);
+  border-radius: 8px;
+  font-size: 16px;
+  background: rgba(15, 75, 207, 0.05);
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: #0f4bcf;
+  background: #ffffff;
+}
+
+.add-btn {
+  width: 100%;
+  padding: 14px;
+  background: #0f4bcf;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.add-btn:hover {
+  background: #0e3fa8;
+}
+
+.vocab-list h2 {
+  margin-bottom: 20px;
+  color: #0f4bcf;
+}
+
+.empty-message {
+  text-align: center;
+  color: #666;
+  font-style: italic;
+  padding: 40px 20px;
+}
+
+.vocab-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #ffffff;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(15, 75, 207, 0.08);
+  border: 1px solid rgba(15, 75, 207, 0.14);
+}
+
+.vocab-table th,
+.vocab-table td {
+  padding: 16px;
+  text-align: left;
+  border-bottom: 1px solid rgba(15, 75, 207, 0.1);
+}
+
+.vocab-table th {
+  background: rgba(15, 75, 207, 0.08);
+  font-weight: 700;
+  color: #0f4bcf;
+}
+
+.vocab-table td {
+  color: #333;
+}
+
+.vocab-table tr:last-child td {
+  border-bottom: none;
+}
+
+.delete-btn {
+  padding: 8px 16px;
+  background: #dc3545;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background-color 0.2s ease;
+}
+
+.delete-btn:hover {
+  background: #c82333;
+}
+
+@media (max-width: 600px) {
+  .vocab-container {
+    padding: 0 10px;
+  }
+
+  .vocab-form {
+    padding: 20px;
+  }
+
+  .vocab-table th,
+  .vocab-table td {
+    padding: 12px 8px;
+    font-size: 14px;
+  }
+
+  .vocab-table th:nth-child(3),
+  .vocab-table td:nth-child(3) {
+    width: 80px;
+  }
+}

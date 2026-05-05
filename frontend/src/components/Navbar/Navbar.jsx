@@ -1,51 +1,52 @@
 import "./Navbar.css";
 import { assets } from "../../assets/assets";
 import { useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 const Navbar = ({ setShowLogin, currentUser, setCurrentUser }) => {
-  const [menu, setMenu] = useState("home");
+  const location = useLocation();
   return (
     <div className="navbar">
-      <h2>
-        <a href="" className="logo">
-          TOEIC
-        </a>
-      </h2>
+      <Link to="/">
+        <h2>
+          <a href="" className="logo">
+            TOEIC
+          </a>
+        </h2>
+      </Link>
       <ul className="navbar-menu">
         <li>
-          <a
-            href="/"
-            className={menu === "home" ? "active" : ""}
-            onClick={() => setMenu("home")}
+          <Link
+            to="/"
+            className={location.pathname === "/" ? "active" : ""}
           >
             Trang chủ
-          </a>
+          </Link>
         </li>
         <li>
-          <a
-            href="/exam"
-            className={menu === "exam" ? "active" : ""}
-            onClick={() => setMenu("exam")}
+          <Link
+            to="/exam"
+            className={location.pathname === "/exam" ? "active" : ""}
           >
             Thi thử
-          </a>
+          </Link>
         </li>
         <li>
           <a
             href="/vocab"
-            className={menu === "vocab" ? "active" : ""}
-            onClick={() => setMenu("vocab")}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={location.pathname === "/vocab" ? "active" : ""}
           >
             Từ vựng
           </a>
         </li>
         <li>
-          <a
-            href="/contact"
-            className={menu === "contact" ? "active" : ""}
-            onClick={() => setMenu("contact")}
+          <Link
+            to="/contact"
+            className={location.pathname === "/contact" ? "active" : ""}
           >
             Liên hệ
-          </a>
+          </Link>
         </li>
       </ul>
       <div className="navbar-auth">
