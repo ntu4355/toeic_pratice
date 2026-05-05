@@ -6,12 +6,33 @@ const STORAGE_KEY = "toeic_users";
 const LOGIN_STATE = "Đăng nhập";
 const REGISTER_STATE = "Đăng ký";
 
+// Mock data - Tài khoản mẫu
+const DEFAULT_USERS = [
+  {
+    fullName: "Admin TOEIC",
+    username: "admin",
+    phone: "0123456789",
+    email: "admin@toeic.com",
+    password: "admin123",
+    role: "admin",
+  },
+  {
+    fullName: "Người Dùng",
+    username: "user",
+    phone: "0987654321",
+    email: "user@toeic.com",
+    password: "user123",
+    role: "user",
+  },
+];
+
 const loadUsers = () => {
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
+    // Luôn khởi tạo DEFAULT_USERS (reset localStorage)
+    saveUsers(DEFAULT_USERS);
+    return DEFAULT_USERS;
   } catch {
-    return [];
+    return DEFAULT_USERS;
   }
 };
 
@@ -67,6 +88,7 @@ const Login = ({ setShowLogin, setCurrentUser }) => {
         fullName: foundUser.fullName,
         username: foundUser.username,
         email: foundUser.email,
+        role: foundUser.role,
       });
       setShowLogin(false);
       return;
@@ -113,6 +135,7 @@ const Login = ({ setShowLogin, setCurrentUser }) => {
       phone: phone.trim(),
       email: normalizedEmail,
       password,
+      role: "user",
     };
 
     saveUsers([...users, newUser]);
@@ -120,6 +143,7 @@ const Login = ({ setShowLogin, setCurrentUser }) => {
       fullName: newUser.fullName,
       username: newUser.username,
       email: newUser.email,
+      role: newUser.role,
     });
     setMessage("Tạo tài khoản thành công. Bạn đã đăng nhập.");
     setShowLogin(false);
@@ -158,6 +182,18 @@ const Login = ({ setShowLogin, setCurrentUser }) => {
             Đăng ký
           </button>
         </div>
+
+        {currState === LOGIN_STATE && (
+          <div className="demo-accounts">
+            <p className="demo-title">📝 Tài khoản mẫu:</p>
+            <div className="demo-item">
+              <strong>Admin:</strong> admin@toeic.com / admin123
+            </div>
+            <div className="demo-item">
+              <strong>User:</strong> user@toeic.com / user123
+            </div>
+          </div>
+        )}
 
         <div className="login-inputs">
           {currState === REGISTER_STATE && (

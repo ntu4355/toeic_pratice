@@ -48,11 +48,21 @@ const Navbar = ({ setShowLogin, currentUser, setCurrentUser }) => {
             Liên hệ
           </Link>
         </li>
+        {currentUser && currentUser.role === "admin" && (
+          <li>
+            <Link
+              to="/admin"
+              className={location.pathname === "/admin" ? "active" : ""}
+            >
+              👨‍💼 Admin
+            </Link>
+          </li>
+        )}
       </ul>
       <div className="navbar-auth">
         {currentUser ? (
           <div className="navbar-user">
-            <span>Xin chào, {currentUser.name}</span>
+            <span>Xin chào, {currentUser.fullName}</span>
             <button
               type="button"
               className="logout-button"

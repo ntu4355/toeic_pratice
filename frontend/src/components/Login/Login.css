@@ -161,3 +161,28 @@
   color: #fff;
   border-color: #0f4bcf;
 }
+
+.demo-accounts {
+  background: rgba(255, 250, 200, 0.6);
+  border: 1px solid rgba(255, 193, 7, 0.3);
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 16px;
+  font-size: 13px;
+}
+
+.demo-title {
+  margin: 0 0 8px 0;
+  color: #666;
+  font-weight: 600;
+}
+
+.demo-item {
+  color: #333;
+  padding: 6px 0;
+  line-height: 1.4;
+}
+
+.demo-item strong {
+  color: #0f4bcf;
+}

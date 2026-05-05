@@ -8,6 +8,8 @@ import Home from "./pages/Home/Home";
 import Vocab from "./pages/Vocab/Vocab";
 import Exam from "./pages/Exam/Exam";
 import Contact from "./pages/Contact/Contact";
+import CreateExam from "./pages/CreateExam/CreateExam";
+import AdminDashboard from "./pages/AdminDashboard/AdminDashboard";
 
 const App = () => {
   const [showLogin, setShowLogin] = useState(false);
@@ -46,6 +48,8 @@ const App = () => {
           <Route path="/" element={<Home />} />
           <Route path="/vocab" element={<Vocab />} />
           <Route path="/exam" element={<Exam />} />
+          <Route path="/create-exam" element={<CreateExam currentUser={currentUser} />} />
+          <Route path="/admin" element={<AdminDashboard currentUser={currentUser} />} />
           <Route path="/contact" element={<Contact />} />
         </Routes>
         <Footer />

@@ -1,82 +1,216 @@
 .exam {
-  padding: 24px;
+  padding: 20px;
 }
 
 .exam h1 {
   margin-bottom: 24px;
-  font-size: 28px;
+  font-size: 24px;
   color: #222;
 }
 
-.exam-list {
+.exams-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 20px;
 }
 
-.exam-item {
+.exam-card {
+  position: relative;
+  padding: 16px;
+  border-radius: 8px;
   background: #fff;
   border: 1px solid #ddd;
-  border-radius: 14px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.05);
-  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   display: flex;
   flex-direction: column;
+  min-height: 140px;
+}
+
+.exam-card-content {
+  flex: 1;
+}
+
+.exam-title {
+  margin: 0 0 12px 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #222;
+  line-height: 1.4;
+}
+
+.exam-btn {
+  padding: 8px 12px;
+  border: 1px solid #999;
+  background: #fff;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #666;
+  transition: all 0.3s ease;
+}
+
+.exam-btn:hover {
+  border-color: #0975ff;
+  color: #0975ff;
+}
+
+.exam-btn.completed {
+  border-color: #ddd;
+  color: #999;
+}
+
+.exam-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.back-btn {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  background: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.3s ease;
+}
+
+.back-btn:hover {
+  background: #f5f5f5;
+  border-color: #999;
+}
+
+.exam-controls {
+  display: flex;
   justify-content: space-between;
-  min-height: 170px;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
 }
 
-.exam-item h3 {
-  margin: 0 0 12px;
-  font-size: 20px;
-  color: #111;
+.controls-left {
+  display: flex;
+  gap: 8px;
 }
 
-.exam-item p {
-  margin: 4px 0;
-  color: #555;
-  line-height: 1.5;
+.control-btn {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  background: #fff;
+  cursor: pointer;
+  transition: all 0.3s ease;
 }
 
-.exam-link {
-  margin-top: 16px;
-  align-self: flex-start;
-  padding: 10px 18px;
+.control-btn:hover {
+  background: #f5f5f5;
+  border-color: #999;
+}
+
+.start-btn {
+  padding: 8px 14px;
+  border-radius: 8px;
   border: none;
-  border-radius: 999px;
   background: #0975ff;
   color: #fff;
   cursor: pointer;
-  transition:
-    transform 0.2s ease,
-    background 0.2s ease;
+  transition: all 0.3s ease;
 }
 
-.exam-link:hover {
-  transform: translateY(-1px);
-  background: #0058d1;
+.start-btn:hover {
+  background: #0860d4;
+}
+
+.parts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.part {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid #e6e6e6;
+  box-shadow: 0 6px 18px rgba(15, 15, 15, 0.03);
+  transition: all 0.3s ease;
+}
+
+.part:hover {
+  border-color: #0975ff;
+}
+
+.part-left {
+  width: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.part-left input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.part-main {
+  flex: 1;
+}
+
+.part-header h3 {
+  margin: 0;
+  font-size: 18px;
 }
 
 @media (max-width: 1200px) {
-  .exam-list {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+  .exams-grid {
+    grid-template-columns: repeat(3, 1fr);
   }
 }
 
-@media (max-width: 992px) {
-  .exam-list {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+@media (max-width: 768px) {
+  .exams-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .exam-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .exam-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .controls-left {
+    width: 100%;
+  }
+
+  .control-btn,
+  .start-btn {
+    width: 100%;
+  }
+
+  .part {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .part-left {
+    width: auto;
+    display: flex;
+    padding-bottom: 8px;
   }
 }
 
-@media (max-width: 720px) {
-  .exam-list {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 520px) {
-  .exam-list {
+@media (max-width: 480px) {
+  .exams-grid {
     grid-template-columns: 1fr;
   }
 }
