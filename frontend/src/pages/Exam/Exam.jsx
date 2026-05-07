@@ -1,170 +1,29 @@
 import "./Exam.css";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 
-const exams = [
-  {
-    id: 1,
-    name: "Practice Set TOEIC 2019 Test 1",
-    duration: 120,
-    views: 516105,
-    comments: 199,
-    parts: 7,
-    questions: 200,
-    isCompleted: false,
-  },
-  {
-    id: 2,
-    name: "Practice Set TOEIC 2019 Test 2",
-    duration: 120,
-    views: 344940,
-    comments: 127,
-    parts: 7,
-    questions: 200,
-    isCompleted: false,
-  },
-  {
-    id: 3,
-    name: "Practice Set TOEIC 2019 Test 3",
-    duration: 120,
-    views: 287622,
-    comments: 118,
-    parts: 7,
-    questions: 200,
-    isCompleted: false,
-  },
-  {
-    id: 4,
-    name: "Practice Set TOEIC 2019 Test 4",
-    duration: 120,
-    views: 239673,
-    comments: 125,
-    parts: 7,
-    questions: 200,
-    isCompleted: false,
-  },
-  {
-    id: 5,
-    name: "Practice Set TOEIC 2019 Test 5",
-    duration: 120,
-    views: 228960,
-    comments: 86,
-    parts: 7,
-    questions: 200,
-    isCompleted: false,
-  },
-  {
-    id: 6,
-    name: "Practice Set TOEIC 2019 Test 6",
-    duration: 120,
-    views: 211206,
-    comments: 73,
-    parts: 7,
-    questions: 200,
-    isCompleted: true,
-  },
-  {
-    id: 7,
-    name: "Practice Set TOEIC 2019 Test 7",
-    duration: 120,
-    views: 196371,
-    comments: 112,
-    parts: 7,
-    questions: 200,
-    isCompleted: true,
-  },
-  {
-    id: 8,
-    name: "Practice Set TOEIC 2019 Test 8",
-    duration: 120,
-    views: 189390,
-    comments: 77,
-    parts: 7,
-    questions: 200,
-    isCompleted: false,
-  },
-  {
-    id: 9,
-    name: "Practice Set TOEIC 2019 Test 9",
-    duration: 120,
-    views: 183642,
-    comments: 63,
-    parts: 7,
-    questions: 200,
-    isCompleted: true,
-  },
-  {
-    id: 10,
-    name: "Practice Set TOEIC 2019 Test 10",
-    duration: 120,
-    views: 201678,
-    comments: 111,
-    parts: 7,
-    questions: 200,
-    isCompleted: true,
-  },
-];
-
+// Chỉ giữ lại cấu trúc các Part của bài thi TOEIC
 const parts = [
-  {
-    id: 1,
-    title: "Part 1",
-    count: 6,
-    tags: [
-      "Tranh tả người",
-      "Tranh tả vật",
-      "Tranh tả cả người và vật",
-    ],
-  },
-  {
-    id: 2,
-    title: "Part 2",
-    count: 25,
-    tags: ["Câu hỏi WHAT", "Câu hỏi WHO", "Câu hỏi WHY", "YES/NO"],
-  },
-  {
-    id: 3,
-    title: "Part 3",
-    count: 39,
-    tags: [
-      "Câu hỏi về chủ đề, mục đích",
-      "Câu hỏi về hành động tương lai",
-      "Chủ đề: Company - General Office Work",
-      "Transportation",
-    ],
-  },
-  {
-    id: 4,
-    title: "Part 4",
-    count: 30,
-    tags: [
-      "Câu hỏi về chủ đề, mục đích",
-      "Dạng bài: Announcement",
-      "Dạng bài: Talk",
-    ],
-  },
-  {
-    id: 5,
-    title: "Part 5",
-    count: 30,
-    tags: ["Từ loại", "Ngữ pháp", "Vị trí từ trong câu"],
-  },
-  {
-    id: 6,
-    title: "Part 6",
-    count: 16,
-    tags: ["Hoàn thành đoạn văn", "Kết nối câu", "Từ nối"],
-  },
-  {
-    id: 7,
-    title: "Part 7",
-    count: 54,
-    tags: ["Single passage", "Multiple passages", "Matching"],
-  },
+  { id: 1, title: "Part 1", count: 6, tags: ["Tranh tả người", "Tranh tả vật"] },
+  { id: 2, title: "Part 2", count: 25, tags: ["Câu hỏi WHAT", "Câu hỏi WHO"] },
+  { id: 3, title: "Part 3", count: 39, tags: ["Câu hỏi về chủ đề", "Hành động tương lai"] },
+  { id: 4, title: "Part 4", count: 30, tags: ["Announcement", "Talk"] },
+  { id: 5, title: "Part 5", count: 30, tags: ["Từ loại", "Ngữ pháp"] },
+  { id: 6, title: "Part 6", count: 16, tags: ["Hoàn thành đoạn văn", "Từ nối"] },
+  { id: 7, title: "Part 7", count: 54, tags: ["Single passage", "Multiple passages"] },
 ];
 
 const Exam = () => {
+  const navigate = useNavigate();
+  const [examsList, setExamsList] = useState([]);
   const [selectedExam, setSelectedExam] = useState(null);
   const [selectedParts, setSelectedParts] = useState(() => new Set());
+
+  // Hook này lấy data trực tiếp từ localStorage, không còn nạp dữ liệu mẫu
+  useEffect(() => {
+    const storedExams = JSON.parse(localStorage.getItem("toeic_exams") || "[]");
+    setExamsList(storedExams);
+  }, []);
 
   const togglePart = (id) => {
     setSelectedParts((prev) => {
@@ -186,9 +45,8 @@ const Exam = () => {
       alert("Vui lòng chọn ít nhất 1 part để bắt đầu.");
       return;
     }
-    const exam = exams.find((e) => e.id === selectedExam);
-    const chosen = parts.filter((p) => selectedParts.has(p.id)).map((p) => p.title);
-    alert(`Bắt đầu thi: ${exam.name}\nCác phần: ${chosen.join(", ")}`);
+    // Chuyển hướng sang trang thi thực tế
+    navigate("/taking-exam");
   };
 
   const handleBackToExams = () => {
@@ -201,21 +59,29 @@ const Exam = () => {
       {selectedExam === null ? (
         <>
           <h1>Chọn đề thi TOEIC</h1>
-          <div className="exams-grid">
-            {exams.map((exam) => (
-              <div key={exam.id} className="exam-card">
-                <div className="exam-card-content">
-                  <h3 className="exam-title">{exam.name}</h3>
+          
+          {examsList.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px', color: '#666', background: '#fff', borderRadius: '12px', border: '1px solid #ddd' }}>
+              <p>Hiện tại hệ thống chưa có đề thi nào. Vui lòng quay lại sau!</p>
+            </div>
+          ) : (
+            <div className="exams-grid">
+              {examsList.map((exam) => (
+                <div key={exam.id} className="exam-card">
+                  <div className="exam-card-content">
+                    <h3 className="exam-title">{exam.name}</h3>
+                    <p style={{fontSize: '13px', color: '#666', marginTop: '8px'}}>Thời gian: {exam.duration} phút</p>
+                  </div>
+                  <button
+                    className={`exam-btn ${exam.isCompleted ? "completed" : ""}`}
+                    onClick={() => setSelectedExam(exam.id)}
+                  >
+                    {exam.isCompleted ? "Xem kết quả" : "Chi tiết"}
+                  </button>
                 </div>
-                <button
-                  className={`exam-btn ${exam.isCompleted ? "completed" : ""}`}
-                  onClick={() => setSelectedExam(exam.id)}
-                >
-                  {exam.isCompleted ? "Xem kết quả" : "Chi tiết"}
-                </button>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </>
       ) : (
         <>
@@ -223,7 +89,7 @@ const Exam = () => {
             <button className="back-btn" onClick={handleBackToExams}>
               ← Quay lại
             </button>
-            <h1>Chọn phần muốn làm - {exams.find((e) => e.id === selectedExam)?.name}</h1>
+            <h1>Chọn phần muốn làm - {examsList.find((e) => e.id === selectedExam)?.name}</h1>
           </div>
 
           <div className="exam-controls">

@@ -144,3 +144,338 @@
     width: 80px;
   }
 }
+.vocab-page {
+  padding: 20px 0;
+}
+
+.vocab-container {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.vocab-container h1 {
+  text-align: center;
+  margin-bottom: 30px;
+  color: #0f4bcf;
+}
+
+.vocab-form {
+  background: #ffffff;
+  border: 1px solid rgba(15, 75, 207, 0.14);
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 40px;
+  box-shadow: 0 8px 30px rgba(15, 75, 207, 0.08);
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: #0f4bcf;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 14px 16px;
+  border: 1px solid rgba(15, 75, 207, 0.18);
+  border-radius: 10px;
+  font-size: 16px;
+  background: rgba(15, 75, 207, 0.03);
+  transition: all 0.2s ease;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: #0f4bcf;
+  background: #ffffff;
+  box-shadow: 0 0 0 4px rgba(15, 75, 207, 0.1);
+}
+
+.add-btn {
+  width: 100%;
+  padding: 14px;
+  background: #0f4bcf;
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.add-btn:hover {
+  background: #0e3fa8;
+  transform: translateY(-1px);
+}
+
+/* === FLASHCARD GRID === */
+.vocab-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  color: #0f4bcf;
+}
+
+.empty-message {
+  text-align: center;
+  color: #666;
+  font-style: italic;
+  padding: 40px 20px;
+  background: #fff;
+  border-radius: 12px;
+  border: 1px dashed rgba(15, 75, 207, 0.3);
+}
+
+.vocab-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 24px;
+}
+
+/* === FLASHCARD 3D EFFECTS === */
+.vocab-card {
+  background-color: transparent;
+  height: 180px;
+  perspective: 1000px;
+  cursor: pointer;
+}
+
+.vocab-card-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  text-align: center;
+  transition: transform 0.6s cubic-bezier(0.4, 0.2, 0.2, 1);
+  transform-style: preserve-3d;
+}
+
+.vocab-card.flipped .vocab-card-inner {
+  transform: rotateY(180deg);
+}
+
+.vocab-card-front,
+.vocab-card-back {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(15, 75, 207, 0.12);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  border: 1px solid rgba(15, 75, 207, 0.14);
+}
+
+/* Mặt trước (Tiếng Anh) */
+.vocab-card-front {
+  background-color: #ffffff;
+}
+
+.vocab-card-front h3 {
+  font-size: 24px;
+  color: #0f2f6d;
+  margin: 0 0 8px 0;
+}
+
+/* Mặt sau (Tiếng Việt) */
+.vocab-card-back {
+  background: linear-gradient(135deg, #0f4bcf 0%, #0f3f92 100%);
+  transform: rotateY(180deg);
+}
+
+.vocab-card-back h3 {
+  font-size: 24px;
+  color: #ffffff;
+  margin: 0 0 8px 0;
+}
+
+.flip-hint {
+  font-size: 13px;
+  color: #5c7aa3;
+  margin: 0;
+  opacity: 0.8;
+}
+
+.vocab-card-back .flip-hint {
+  color: #dbe8ff;
+}
+
+/* Nút xóa góc trên bên phải */
+.delete-card-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(220, 53, 69, 0.1);
+  color: #dc3545;
+  border: none;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 0.2s ease;
+}
+
+.delete-card-btn:hover {
+  background: #dc3545;
+  color: #fff;
+}
+
+.vocab-card-back .delete-card-btn {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+.vocab-card-back .delete-card-btn:hover {
+  background: #dc3545;
+}
+
+@media (max-width: 600px) {
+  .vocab-container {
+    padding: 0 16px;
+  }
+  .vocab-cards-grid {
+    grid-template-columns: 1fr;
+  }
+}
+/* === VÙNG GỢI Ý TỪ VỰNG === */
+.suggestions-wrapper {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px dashed rgba(15, 75, 207, 0.2);
+}
+
+.suggestions-title {
+  font-size: 14px;
+  color: #5c7aa3;
+  margin-bottom: 12px;
+  font-weight: 600;
+}
+
+.suggestions-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.suggestion-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: #f0f7ff;
+  border: 1px solid #dce8ff;
+  border-radius: 999px;
+  font-size: 13px;
+  color: #0f4bcf;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.suggestion-chip:hover {
+  background: #0f4bcf;
+  color: #fff;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(15, 75, 207, 0.15);
+}
+
+.suggestion-chip span {
+  font-weight: 700;
+  font-size: 16px;
+  line-height: 1;
+}
+/* === AUTOCOMPLETE DROPDOWN === */
+.input-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.autocomplete-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: #ffffff;
+  border: 1px solid rgba(15, 75, 207, 0.18);
+  border-radius: 10px;
+  box-shadow: 0 8px 20px rgba(15, 75, 207, 0.12);
+  margin-top: 4px;
+  z-index: 10;
+  overflow: hidden;
+  list-style: none;
+  padding: 0;
+}
+
+.autocomplete-item {
+  padding: 12px 16px;
+  cursor: pointer;
+  color: #0f2f6d;
+  font-size: 15px;
+  transition: background-color 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.autocomplete-item:hover {
+  background-color: #f0f7ff;
+  color: #0f4bcf;
+}
+
+.autocomplete-item:not(:last-child) {
+  border-bottom: 1px solid rgba(15, 75, 207, 0.05);
+}
+
+.autocomplete-icon {
+  color: #5c7aa3;
+  font-size: 14px;
+}
+/* === TRANSLATION SUGGESTION === */
+.translation-suggestion {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #5c7aa3;
+}
+
+.translate-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  background: #e8f5e9;
+  border: 1px dashed #4caf50;
+  border-radius: 999px;
+  color: #2e7d32;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 600;
+}
+
+.translate-chip:hover {
+  background: #4caf50;
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.translate-loading {
+  font-style: italic;
+  color: #888;
+  font-size: 13px;
+  margin-top: 8px;
+}

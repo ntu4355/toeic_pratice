@@ -10,6 +10,7 @@ import Exam from "./pages/Exam/Exam";
 import Contact from "./pages/Contact/Contact";
 import CreateExam from "./pages/CreateExam/CreateExam";
 import AdminDashboard from "./pages/AdminDashboard/AdminDashboard";
+import TakingExam from "./pages/TakingExam/TakingExam";
 
 const App = () => {
   const [showLogin, setShowLogin] = useState(false);
@@ -51,6 +52,7 @@ const App = () => {
           <Route path="/create-exam" element={<CreateExam currentUser={currentUser} />} />
           <Route path="/admin" element={<AdminDashboard currentUser={currentUser} />} />
           <Route path="/contact" element={<Contact />} />
+          <Route path="/taking-exam" element={<TakingExam />} />
         </Routes>
         <Footer />
       </div>
