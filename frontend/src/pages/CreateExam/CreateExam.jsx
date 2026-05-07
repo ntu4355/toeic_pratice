@@ -17,7 +17,6 @@ const CreateExam = ({ currentUser }) => {
   const [formData, setFormData] = useState({
     examName: "",
     duration: "120",
-    difficulty: "Medium",
     description: "",
   });
 
@@ -25,7 +24,6 @@ const CreateExam = ({ currentUser }) => {
   const [audioFile, setAudioFile] = useState(null);
   const [documentFile, setDocumentFile] = useState(null);
   
-  // Trạng thái chờ AI xử lý
   const [isProcessing, setIsProcessing] = useState(false);
 
   const audioInputRef = useRef(null);
@@ -109,7 +107,6 @@ const CreateExam = ({ currentUser }) => {
     setDragState(false);
   };
 
-  // === HÀM GỬI FILE LÊN BACKEND CHO AI XỬ LÝ ===
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -123,14 +120,12 @@ const CreateExam = ({ currentUser }) => {
       return;
     }
 
-    setIsProcessing(true); // Bật trạng thái loading
+    setIsProcessing(true); 
 
-    // Tạo đối tượng FormData để chứa file
     const uploadData = new FormData();
     uploadData.append("examFile", documentFile);
 
     try {
-      // Gọi API sang Backend (cổng 5000)
       const response = await fetch("http://localhost:5000/api/upload-exam", {
         method: "POST",
         body: uploadData,
@@ -143,7 +138,6 @@ const CreateExam = ({ currentUser }) => {
       const result = await response.json();
       const extractedQuestions = result.examData;
 
-      // Lưu trữ đề thi cùng bộ câu hỏi AI vừa bóc tách vào localStorage
       const storedExams = JSON.parse(localStorage.getItem("toeic_exams") || "[]");
       const newExam = {
         id: Date.now(),
@@ -158,7 +152,7 @@ const CreateExam = ({ currentUser }) => {
         created: new Date().toISOString().split("T")[0],
         audioFileName: audioFile ? audioFile.name : null,
         docFileName: documentFile.name,
-        examData: extractedQuestions, // Dữ liệu AI trả về
+        examData: extractedQuestions, 
       };
 
       const updatedExams = [newExam, ...storedExams];
@@ -166,8 +160,8 @@ const CreateExam = ({ currentUser }) => {
 
       alert(`Tuyệt vời!\nAI đã trích xuất thành công ${extractedQuestions.length} câu hỏi.\nĐã lưu đề thi: ${formData.examName}`);
       
-      // Reset form
-      setFormData({ examName: "", duration: "120", difficulty: "Medium", description: "" });
+      // Đã xóa trạng thái reset của 'difficulty'
+      setFormData({ examName: "", duration: "120", description: "" });
       setSelectedParts(new Set());
       setAudioFile(null);
       setDocumentFile(null);
@@ -176,7 +170,7 @@ const CreateExam = ({ currentUser }) => {
       console.error(error);
       alert("Có lỗi xảy ra trong quá trình AI phân tích. Vui lòng kiểm tra lại Backend!");
     } finally {
-      setIsProcessing(false); // Tắt trạng thái loading
+      setIsProcessing(false);
     }
   };
 
@@ -193,19 +187,10 @@ const CreateExam = ({ currentUser }) => {
           <input type="text" id="examName" name="examName" value={formData.examName} onChange={handleChange} placeholder="Ví dụ: TOEIC Practice Test 2024 - Test 1" required disabled={isProcessing} />
         </div>
 
-        <div className="form-row">
-          <div className="form-group">
-            <label htmlFor="duration">Thời gian làm bài (Phút)</label>
-            <input type="number" id="duration" name="duration" value={formData.duration} onChange={handleChange} min="10" max="180" required disabled={isProcessing} />
-          </div>
-          <div className="form-group">
-            <label htmlFor="difficulty">Độ khó</label>
-            <select id="difficulty" name="difficulty" value={formData.difficulty} onChange={handleChange} disabled={isProcessing}>
-              <option value="Easy">Dễ</option>
-              <option value="Medium">Trung bình</option>
-              <option value="Hard">Khó</option>
-            </select>
-          </div>
+        {/* Ô Thời gian được mở rộng khi đã xóa bỏ Độ khó */}
+        <div className="form-group">
+          <label htmlFor="duration">Thời gian làm bài (Phút)</label>
+          <input type="number" id="duration" name="duration" value={formData.duration} onChange={handleChange} min="10" max="180" required disabled={isProcessing} />
         </div>
 
         <div className="form-group">
