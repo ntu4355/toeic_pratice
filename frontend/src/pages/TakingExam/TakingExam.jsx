@@ -1,31 +1,41 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import "./TakingExam.css";
-
-// Dữ liệu câu hỏi mẫu
-const mockQuestions = [
-  {
-    id: 1,
-    text: "1. What is the main purpose of the announcement?",
-    options: ["A. To advertise a new product", "B. To announce a staff change", "C. To schedule a meeting", "D. To request a repair"],
-  },
-  {
-    id: 2,
-    text: "2. When will the event take place?",
-    options: ["A. On Monday", "B. On Tuesday", "C. On Wednesday", "D. On Friday"],
-  },
-  {
-    id: 3,
-    text: "3. Who is Mr. Smith?",
-    options: ["A. The new CEO", "B. A client", "C. The building manager", "D. A job applicant"],
-  }
-];
 
 const TakingExam = () => {
   const navigate = useNavigate();
-  // Khởi tạo thời gian 120 phút (7200 giây)
+  const location = useLocation();
+  const examId = location.state?.examId; // Lấy ID đề thi được truyền sang
+  
+  const [examInfo, setExamInfo] = useState(null);
+  const [questions, setQuestions] = useState([]);
   const [timeLeft, setTimeLeft] = useState(7200); 
   const [answers, setAnswers] = useState({});
+
+  // Kéo dữ liệu đề thi từ localStorage khi mở trang
+  useEffect(() => {
+    if (!examId) {
+      alert("Không tìm thấy thông tin đề thi!");
+      navigate("/exam");
+      return;
+    }
+
+    const storedExams = JSON.parse(localStorage.getItem("toeic_exams") || "[]");
+    const currentExam = storedExams.find(e => e.id === examId);
+
+    if (currentExam) {
+      setExamInfo(currentExam);
+      // Gán thời gian làm bài (phút -> giây)
+      setTimeLeft(currentExam.duration * 60);
+      
+      // Lấy danh sách câu hỏi đã được import từ Excel (nếu có)
+      if (currentExam.examData && currentExam.examData.length > 0) {
+        setQuestions(currentExam.examData);
+      } else {
+        alert("Đề thi này chưa có file dữ liệu câu hỏi!");
+      }
+    }
+  }, [examId, navigate]);
 
   // Logic đồng hồ đếm ngược
   useEffect(() => {
@@ -39,64 +49,88 @@ const TakingExam = () => {
     return () => clearInterval(timer);
   }, [timeLeft]);
 
-  // Format giây thành mm:ss
   const formatTime = (seconds) => {
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
     return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
   };
 
-  const handleSelectAnswer = (questionId, optionLetter) => {
+  const handleSelectAnswer = (questionNo, optionLetter) => {
     setAnswers((prev) => ({
       ...prev,
-      [questionId]: optionLetter,
+      [questionNo]: optionLetter,
     }));
   };
 
   const handleAutoSubmit = () => {
     alert("Hết giờ làm bài! Hệ thống đang tự động thu bài...");
-    navigate("/"); // Tạm thời điều hướng về trang chủ
+    navigate("/"); 
   };
 
   const handleManualSubmit = () => {
     const isConfirm = window.confirm("Bạn có chắc chắn muốn nộp bài ngay bây giờ?");
     if (isConfirm) {
+      // TẠM THỜI: In ra console đáp án người dùng chọn để bạn kiểm tra
+      console.log("Đáp án học viên chọn:", answers);
       alert("Nộp bài thành công! Chúng ta sẽ làm phần chấm điểm sau.");
-      navigate("/"); 
+      navigate("/exam"); 
     }
   };
+
+  if (!examInfo || questions.length === 0) {
+    return <div style={{textAlign: "center", padding: "50px"}}>Đang tải dữ liệu bài thi...</div>;
+  }
 
   return (
     <div className="taking-exam">
       {/* Cột trái: Nội dung bài thi */}
       <div className="exam-content">
+        <h2 style={{color: "#0f2f6d", marginBottom: "20px"}}>{examInfo.name}</h2>
+        
+        {/* Giả lập Audio Player */}
         <div className="audio-player-mock">
           <button className="audio-btn">▶</button>
           <div className="audio-progress">
             <div className="audio-progress-bar"></div>
           </div>
-          <span style={{color: '#0f4bcf', fontWeight: '600'}}>01:24 / 45:00</span>
+          <span style={{color: '#0f4bcf', fontWeight: '600'}}>00:00 / {examInfo.duration}:00</span>
         </div>
 
         <div className="questions-list">
-          {mockQuestions.map((q) => (
-            <div key={q.id} className="question-block">
-              <div className="question-text">{q.text}</div>
+          {questions.map((q) => (
+            <div key={q.QuestionNo} className="question-block">
+              {/* Hiển thị câu hỏi */}
+              <div className="question-text">
+                <span style={{fontWeight: "bold", marginRight: "8px"}}>{q.QuestionNo}.</span> 
+                {q.QuestionText}
+              </div>
+              
+              {/* Hiển thị các đáp án từ Excel */}
               <div className="options-grid">
-                {q.options.map((opt) => {
-                  const letter = opt.charAt(0); // Lấy chữ cái A, B, C, D
-                  return (
-                    <label key={opt} className="option-label">
-                      <input 
-                        type="radio" 
-                        name={`q-${q.id}`} 
-                        checked={answers[q.id] === letter}
-                        onChange={() => handleSelectAnswer(q.id, letter)}
-                      />
-                      <span>{opt}</span>
-                    </label>
-                  );
-                })}
+                {q.OptionA && (
+                  <label className="option-label">
+                    <input type="radio" name={`q-${q.QuestionNo}`} checked={answers[q.QuestionNo] === 'A'} onChange={() => handleSelectAnswer(q.QuestionNo, 'A')} />
+                    <span>A. {q.OptionA}</span>
+                  </label>
+                )}
+                {q.OptionB && (
+                  <label className="option-label">
+                    <input type="radio" name={`q-${q.QuestionNo}`} checked={answers[q.QuestionNo] === 'B'} onChange={() => handleSelectAnswer(q.QuestionNo, 'B')} />
+                    <span>B. {q.OptionB}</span>
+                  </label>
+                )}
+                {q.OptionC && (
+                  <label className="option-label">
+                    <input type="radio" name={`q-${q.QuestionNo}`} checked={answers[q.QuestionNo] === 'C'} onChange={() => handleSelectAnswer(q.QuestionNo, 'C')} />
+                    <span>C. {q.OptionC}</span>
+                  </label>
+                )}
+                {q.OptionD && (
+                  <label className="option-label">
+                    <input type="radio" name={`q-${q.QuestionNo}`} checked={answers[q.QuestionNo] === 'D'} onChange={() => handleSelectAnswer(q.QuestionNo, 'D')} />
+                    <span>D. {q.OptionD}</span>
+                  </label>
+                )}
               </div>
             </div>
           ))}
@@ -113,18 +147,23 @@ const TakingExam = () => {
         <div className="answer-sheet">
           <h3>Phiếu trả lời</h3>
           <div className="sheet-grid">
-            {mockQuestions.map((q) => (
-              <div key={q.id} className="sheet-item">
-                <span className="sheet-number">{q.id}.</span>
-                {["A", "B", "C", "D"].map((letter) => (
-                  <div 
-                    key={letter}
-                    onClick={() => handleSelectAnswer(q.id, letter)}
-                    className={`sheet-bubble ${answers[q.id] === letter ? 'selected' : ''}`}
-                  >
-                    {letter}
-                  </div>
-                ))}
+            {questions.map((q) => (
+              <div key={q.QuestionNo} className="sheet-item">
+                <span className="sheet-number">{q.QuestionNo}.</span>
+                {["A", "B", "C", "D"].map((letter) => {
+                  // Ẩn bong bóng D nếu câu đó không có OptionD (như Part 2)
+                  if (letter === "D" && !q.OptionD) return null;
+                  
+                  return (
+                    <div 
+                      key={letter}
+                      onClick={() => handleSelectAnswer(q.QuestionNo, letter)}
+                      className={`sheet-bubble ${answers[q.QuestionNo] === letter ? 'selected' : ''}`}
+                    >
+                      {letter}
+                    </div>
+                  )
+                })}
               </div>
             ))}
           </div>

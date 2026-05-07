@@ -45,8 +45,8 @@ const Exam = () => {
       alert("Vui lòng chọn ít nhất 1 part để bắt đầu.");
       return;
     }
-    // Chuyển hướng sang trang thi thực tế
-    navigate("/taking-exam");
+    // TRUYỀN ID CỦA ĐỀ THI SANG TRANG LÀM BÀI
+    navigate("/taking-exam", { state: { examId: selectedExam } });
   };
 
   const handleBackToExams = () => {

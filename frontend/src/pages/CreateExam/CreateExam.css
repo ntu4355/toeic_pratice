@@ -209,3 +209,69 @@
   font-weight: 600;
   font-size: 14px;
 }
+/* === KHI FILE ĐƯỢC KÉO VÀO === */
+.upload-zone.drag-active {
+  background-color: #e4f0ff;
+  border-color: #0f4bcf;
+  transform: scale(1.02);
+}
+
+/* === HIỂN THỊ FILE ĐÃ CHỌN === */
+.file-preview {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: #f8fbff;
+  border: 1px solid #cce0ff;
+  border-radius: 10px;
+  margin-top: 8px;
+}
+
+.file-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.file-icon {
+  font-size: 24px;
+}
+
+.file-details {
+  display: flex;
+  flex-direction: column;
+}
+
+.file-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f2f6d;
+  max-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-size {
+  font-size: 12px;
+  color: #5c7aa3;
+}
+
+.remove-file-btn {
+  background: rgba(220, 53, 69, 0.1);
+  color: #dc3545;
+  border: none;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.remove-file-btn:hover {
+  background: #dc3545;
+  color: #fff;
+}
