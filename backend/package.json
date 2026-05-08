@@ -16,6 +16,7 @@
     "cors": "^x.x.x",
     "dotenv": "^x.x.x",
     "express": "^x.x.x",
-    "multer": "^x.x.x"
+    "multer": "^x.x.x",
+    "pdf-lib": "^1.17.1"
   }
 }

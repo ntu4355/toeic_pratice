@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./CreateExam.css";
 
@@ -10,9 +10,7 @@ const CreateExam = ({ currentUser }) => {
     description: "",
   });
 
-  const [audioFile, setAudioFile] = useState(null); 
-  const [documentFile, setDocumentFile] = useState(null);
-  
+  const [selectedFiles, setSelectedFiles] = useState([]); // Lưu mảng file tích lũy
   const [isProcessing, setIsProcessing] = useState(false);
   const [pendingQuestions, setPendingQuestions] = useState(null); 
 
@@ -33,19 +31,39 @@ const CreateExam = ({ currentUser }) => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  // --- BƯỚC 1: GỬI PDF & ZIP CHO BACKEND XỬ LÝ ---
-  const handleAnalyzePDF = async (e) => {
+  // --- LOGIC MỚI: CHỌN THÊM FILE TÍCH LŨY ---
+  const handleFileChange = (e) => {
+    const newFiles = Array.from(e.target.files);
+    
+    setSelectedFiles((prevFiles) => {
+      // Lọc bỏ những file đã tồn tại (trùng tên) để tránh bị chọn đúp
+      const existingFileNames = prevFiles.map(f => f.name);
+      const uniqueNewFiles = newFiles.filter(f => !existingFileNames.includes(f.name));
+      
+      return [...prevFiles, ...uniqueNewFiles]; // Nối file mới vào danh sách cũ
+    });
+
+    // Reset lại value của input để nếu người dùng xóa file rồi muốn chọn lại chính file đó thì vẫn được
+    e.target.value = null; 
+  };
+
+  // --- LOGIC MỚI: XÓA TỪNG FILE ---
+  const handleRemoveFile = (indexToRemove) => {
+    setSelectedFiles((prevFiles) => prevFiles.filter((_, index) => index !== indexToRemove));
+  };
+
+  // --- BƯỚC 1: GỬI TẤT CẢ FILE CHO BACKEND XỬ LÝ ---
+  const handleAnalyzeFiles = async (e) => {
     e.preventDefault();
 
-    if (!documentFile) return alert("Vui lòng tải lên file PDF đề thi!");
+    if (selectedFiles.length === 0) return alert("Vui lòng chọn ít nhất 1 file PDF đề thi!");
 
     setIsProcessing(true); 
 
     const uploadData = new FormData();
-    uploadData.append("examFile", documentFile);
-    if (audioFile) {
-      uploadData.append("audioZip", audioFile); 
-    }
+    selectedFiles.forEach(file => {
+      uploadData.append("files", file); 
+    });
 
     try {
       const response = await fetch("http://localhost:5000/api/upload-exam", {
@@ -53,22 +71,20 @@ const CreateExam = ({ currentUser }) => {
         body: uploadData,
       });
 
-      if (!response.ok) throw new Error("Lỗi khi kết nối với máy chủ AI");
-
       const result = await response.json();
+      if (!response.ok) throw new Error(result.message || "Lỗi khi kết nối với máy chủ AI");
       
-      // Chuyển sang giao diện thêm ảnh Part 1
       setPendingQuestions(result.examData);
 
     } catch (error) {
       console.error(error);
-      alert("Có lỗi xảy ra trong quá trình AI phân tích. Vui lòng kiểm tra Backend.");
+      alert(`Có lỗi xảy ra: ${error.message}`);
     } finally {
       setIsProcessing(false);
     }
   };
 
-  // --- HÀM XỬ LÝ UPLOAD ẢNH CHO PART 1 ---
+  // --- HÀM XỬ LÝ UPLOAD ẢNH CHO PART 1 (BƯỚC 2) ---
   const handleImageUpload = (questionNo, e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -83,9 +99,8 @@ const CreateExam = ({ currentUser }) => {
     reader.readAsDataURL(file);
   };
 
-  // --- BƯỚC 2: LƯU ĐỀ THI HOÀN CHỈNH VÀO LOCALSTORAGE ---
+  // --- LƯU ĐỀ THI HOÀN CHỈNH VÀO LOCALSTORAGE ---
   const handleFinalSave = () => {
-    // Tự động phân tích các Part và đếm số câu hỏi từ dữ liệu AI trả về
     const extractedPartsSet = new Set(pendingQuestions.map(q => Number(q.Part)));
     const configuredParts = Array.from(extractedPartsSet).sort((a, b) => a - b);
     const totalQuestions = pendingQuestions.length;
@@ -97,13 +112,12 @@ const CreateExam = ({ currentUser }) => {
       duration: parseInt(formData.duration),
       views: 0,
       comments: 0,
-      configuredParts: configuredParts, // Lấy mảng Part AI tìm được
-      parts: configuredParts.length,    // Tổng số Part
-      questions: totalQuestions,        // Tổng số câu hỏi
+      configuredParts: configuredParts, 
+      parts: configuredParts.length,    
+      questions: totalQuestions,        
       isCompleted: false,
       created: new Date().toISOString().split("T")[0],
-      audioFileName: audioFile ? audioFile.name : null,
-      docFileName: documentFile.name,
+      fileNames: selectedFiles.map(f => f.name).join(", "),
       examData: pendingQuestions, 
     };
 
@@ -112,9 +126,9 @@ const CreateExam = ({ currentUser }) => {
 
     alert(`Hoàn tất!\nĐã lưu đề thi: ${formData.examName} (${totalQuestions} câu hỏi)`);
     
+    // Reset form
     setFormData({ examName: "", duration: "120", description: "" });
-    setAudioFile(null);
-    setDocumentFile(null);
+    setSelectedFiles([]);
     setPendingQuestions(null);
   };
 
@@ -145,7 +159,7 @@ const CreateExam = ({ currentUser }) => {
           )}
           
           <div className="form-actions" style={{ marginTop: "30px" }}>
-             <button type="button" className="btn-cancel" onClick={() => setPendingQuestions(null)}>Hủy bỏ</button>
+             <button type="button" className="btn-cancel" onClick={() => setPendingQuestions(null)}>Quay lại</button>
              <button type="button" className="btn-submit" onClick={handleFinalSave}>Lưu Đề Thi Chính Thức</button>
           </div>
         </div>
@@ -153,14 +167,15 @@ const CreateExam = ({ currentUser }) => {
     );
   }
 
-  // GIAO DIỆN BƯỚC 1: FORM ĐIỀN THÔNG TIN CƠ BẢN ĐÃ ĐƯỢC RÚT GỌN
+  // GIAO DIỆN BƯỚC 1: FORM CHÍNH
   return (
     <div className="create-exam-container">
       <div className="create-header">
         <h2>Tạo Đề Thi Bằng Trí Tuệ Nhân Tạo</h2>
+        <p>Hỗ trợ gộp nhiều file (VD: 1 PDF Listening, 1 PDF Reading, 1 ZIP Audio)</p>
       </div>
 
-      <form className="create-form" onSubmit={handleAnalyzePDF}>
+      <form className="create-form" onSubmit={handleAnalyzeFiles}>
         <div className="form-group">
           <label htmlFor="examName">Tên đề thi (*)</label>
           <input type="text" id="examName" name="examName" value={formData.examName} onChange={handleChange} required disabled={isProcessing} />
@@ -171,22 +186,76 @@ const CreateExam = ({ currentUser }) => {
           <input type="number" id="duration" name="duration" value={formData.duration} onChange={handleChange} required disabled={isProcessing} />
         </div>
 
-        {/* ĐÃ XÓA KHỐI CHỌN PART Ở ĐÂY */}
-
         <div className="form-group">
-          <label>File Audio Listening (.zip) (Nén các file 1.mp3, 32-34.mp3...)</label>
-          <input type="file" accept=".zip" onChange={(e) => setAudioFile(e.target.files[0])} disabled={isProcessing} />
-        </div>
+          <label>Chọn tất cả các file liên quan (PDF Đề, ZIP Audio)</label>
+          <div className="file-drop-zone" style={{ border: '2px dashed #0f2f6d', padding: '20px', textAlign: 'center', borderRadius: '8px', backgroundColor: '#f8fafc' }}>
+            
+            <input 
+              id="multiFilePicker"
+              type="file" 
+              multiple 
+              onChange={handleFileChange} 
+              style={{ marginBottom: '15px' }}
+              disabled={isProcessing}
+            />
 
-        <div className="form-group">
-          <label>File Đề Thi (.pdf) (*)</label>
-          <input type="file" accept=".pdf" onChange={(e) => setDocumentFile(e.target.files[0])} required disabled={isProcessing} />
+            {/* --- GIAO DIỆN MỚI: DANH SÁCH FILE CÓ NÚT XÓA --- */}
+            {selectedFiles.length > 0 && (
+              <div className="file-list" style={{ textAlign: "left", marginTop: "10px", padding: "10px", backgroundColor: "#fff", border: "1px solid #e2e8f0", borderRadius: "6px" }}>
+                <strong>Đã chọn {selectedFiles.length} file:</strong>
+                <ul style={{ listStyleType: "none", paddingLeft: "0", marginTop: "10px" }}>
+                  {selectedFiles.map((f, i) => (
+                    <li key={i} style={{ 
+                      fontSize: '13px', 
+                      color: '#334155', 
+                      margin: "5px 0", 
+                      display: "flex", 
+                      justifyContent: "space-between", 
+                      alignItems: "center",
+                      backgroundColor: "#f1f5f9",
+                      padding: "8px 12px",
+                      borderRadius: "4px",
+                      border: "1px solid #cbd5e1"
+                    }}>
+                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", paddingRight: "10px" }}>
+                        {f.name.endsWith('.pdf') ? '📄' : f.name.endsWith('.zip') ? '📦' : '📁'} {f.name}
+                      </span>
+                      <button 
+                        type="button" 
+                        onClick={() => handleRemoveFile(i)}
+                        title="Xóa file này"
+                        style={{
+                          background: "transparent",
+                          border: "none",
+                          color: "#ef4444",
+                          cursor: "pointer",
+                          fontWeight: "bold",
+                          fontSize: "16px",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          padding: "0 5px"
+                        }}
+                      >
+                        ✕
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {/* ------------------------------------------------ */}
+            
+          </div>
+          <small style={{ color: "#64748b", display: "block", marginTop: "5px" }}>
+            * Mẹo: Bạn có thể chọn nhiều lần, các file mới sẽ được cộng dồn vào danh sách.
+          </small>
         </div>
 
         <div className="form-actions">
            <button type="button" className="btn-cancel" onClick={() => navigate('/admin')} disabled={isProcessing}>Hủy bỏ</button>
-           <button type="submit" className="btn-submit" disabled={isProcessing}>
-             {isProcessing ? "⏳ Đang phân tích PDF và ZIP..." : "Phân tích đề thi"}
+           <button type="submit" className="btn-submit" disabled={isProcessing || selectedFiles.length === 0}>
+             {isProcessing ? "⏳ AI đang đọc và xử lý các file..." : "Phân tích đề thi"}
            </button>
         </div>
       </form>
