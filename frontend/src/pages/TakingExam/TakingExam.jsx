@@ -7,7 +7,6 @@ const TakingExam = () => {
   const location = useLocation();
   const examId = location.state?.examId; 
   
-  // Lấy danh sách Part đã chọn từ Exam.jsx
   const selectedParts = location.state?.selectedParts || []; 
   
   const [examInfo, setExamInfo] = useState(null);
@@ -32,7 +31,6 @@ const TakingExam = () => {
       if (currentExam.examData && currentExam.examData.length > 0) {
         let finalQuestions = currentExam.examData;
         
-        // Lọc câu hỏi theo Part được chọn
         if (selectedParts && selectedParts.length > 0) {
           finalQuestions = finalQuestions.filter(q => 
             selectedParts.map(Number).includes(Number(q.Part))
@@ -40,17 +38,17 @@ const TakingExam = () => {
         }
 
         if (finalQuestions.length === 0) {
-          alert("Không có câu hỏi nào thuộc các Part bạn vừa chọn.");
+          alert("Không có câu hỏi nào thuộc các Part bạn vừa chọn. Vui lòng chọn lại!");
           navigate("/exam");
           return;
         }
         
         setQuestions(finalQuestions);
       } else {
-        alert("Đề thi này chưa có dữ liệu câu hỏi!");
+        alert("Đề thi này chưa có file dữ liệu câu hỏi!");
       }
     }
-  }, [examId, navigate]); 
+  }, [examId, navigate, selectedParts]); 
 
   useEffect(() => {
     if (timeLeft <= 0) {
@@ -82,7 +80,7 @@ const TakingExam = () => {
     const isConfirm = window.confirm("Bạn có chắc chắn muốn nộp bài ngay bây giờ?");
     if (isConfirm) {
       console.log("Đáp án học viên chọn:", answers);
-      alert("Nộp bài thành công! Phần chấm điểm sẽ được cập nhật sau.");
+      alert("Nộp bài thành công! Chúng ta sẽ làm phần chấm điểm sau.");
       navigate("/exam"); 
     }
   };
@@ -94,9 +92,10 @@ const TakingExam = () => {
     }
   };
 
-  // Gom nhóm câu hỏi cho Sidebar bên phải
   const groupedQuestions = questions.reduce((acc, curr) => {
-    if (!acc[curr.Part]) acc[curr.Part] = [];
+    if (!acc[curr.Part]) {
+      acc[curr.Part] = [];
+    }
     acc[curr.Part].push(curr);
     return acc;
   }, {});
@@ -107,63 +106,64 @@ const TakingExam = () => {
 
   return (
     <div className="taking-exam">
-      {/* CỘT TRÁI: Nội dung bài thi */}
       <div className="exam-content">
         <h2 style={{color: "#0f2f6d", marginBottom: "20px"}}>{examInfo.name}</h2>
-
+        
         <div className="questions-list">
           {questions.map((q) => (
             <div key={q.QuestionNo} id={`question-${q.QuestionNo}`} className="question-block">
+              
+              {/* 1. Số thứ tự và nội dung câu hỏi */}
               <div className="question-text">
                 <span style={{fontWeight: "bold", marginRight: "8px"}}>{q.QuestionNo}.</span> 
                 {q.QuestionText}
               </div>
               
-              {/* --- AUDIO PLAYER (Chỉ hiển thị ở câu đầu tiên của nhóm Audio) --- */}
+              {/* 2. AUDIO PLAYER */}
               {q.AudioUrl && (
-                <div className="question-audio" style={{ margin: "15px 0", width: "100%" }}>
-                  <audio controls style={{ width: "100%", height: "45px", outline: "none" }}>
+                <div className="question-audio-wrapper" style={{
+                  margin: "15px 0", padding: "8px 15px", backgroundColor: "#f1f5f9",
+                  borderRadius: "50px", display: "flex", alignItems: "center", border: "1px solid #e2e8f0"
+                }}>
+                  <audio controls controlsList="nodownload" style={{ width: "100%", height: "35px", outline: "none" }}>
                     <source src={q.AudioUrl} type="audio/mpeg" />
-                    Trình duyệt của bạn không hỗ trợ thẻ audio.
+                    Trình duyệt của bạn không hỗ trợ phát âm thanh.
                   </audio>
                 </div>
               )}
 
-              {/* --- HIỂN THỊ HÌNH ẢNH PART 1 --- */}
+              {/* 3. HÌNH ẢNH (Part 1) */}
               {q.ImageUrl && (
                 <div className="question-image" style={{ margin: "15px 0", textAlign: "center" }}>
                   <img 
-                    src={q.ImageUrl} 
-                    alt={`Hình ảnh câu ${q.QuestionNo}`} 
-                    style={{ maxWidth: "100%", maxHeight: "350px", objectFit: "contain", borderRadius: "6px", border: "1px solid #e2e8f0" }} 
+                    src={q.ImageUrl} alt={`Hình ảnh câu ${q.QuestionNo}`} 
+                    style={{ maxWidth: "100%", maxHeight: "400px", objectFit: "contain", borderRadius: "8px", border: "1px solid #dee2e6", boxShadow: "0 2px 4px rgba(0,0,0,0.05)" }} 
                   />
                 </div>
               )}
 
-              {/* --- ĐÁP ÁN --- */}
+              {/* 4. ĐÁP ÁN (ĐÃ ĐƯỢC FIX ĐỂ LUÔN HIỂN THỊ) */}
               <div className="options-grid">
-                {q.OptionA && (
-                  <label className="option-label">
-                    <input type="radio" name={`q-${q.QuestionNo}`} checked={answers[q.QuestionNo] === 'A'} onChange={() => handleSelectAnswer(q.QuestionNo, 'A')} />
-                    <span>A. {q.OptionA}</span>
-                  </label>
-                )}
-                {q.OptionB && (
-                  <label className="option-label">
-                    <input type="radio" name={`q-${q.QuestionNo}`} checked={answers[q.QuestionNo] === 'B'} onChange={() => handleSelectAnswer(q.QuestionNo, 'B')} />
-                    <span>B. {q.OptionB}</span>
-                  </label>
-                )}
-                {q.OptionC && (
-                  <label className="option-label">
-                    <input type="radio" name={`q-${q.QuestionNo}`} checked={answers[q.QuestionNo] === 'C'} onChange={() => handleSelectAnswer(q.QuestionNo, 'C')} />
-                    <span>C. {q.OptionC}</span>
-                  </label>
-                )}
-                {q.OptionD && (
+                <label className="option-label">
+                  <input type="radio" name={`q-${q.QuestionNo}`} checked={answers[q.QuestionNo] === 'A'} onChange={() => handleSelectAnswer(q.QuestionNo, 'A')} />
+                  <span>A. {q.OptionA || ""}</span>
+                </label>
+
+                <label className="option-label">
+                  <input type="radio" name={`q-${q.QuestionNo}`} checked={answers[q.QuestionNo] === 'B'} onChange={() => handleSelectAnswer(q.QuestionNo, 'B')} />
+                  <span>B. {q.OptionB || ""}</span>
+                </label>
+
+                <label className="option-label">
+                  <input type="radio" name={`q-${q.QuestionNo}`} checked={answers[q.QuestionNo] === 'C'} onChange={() => handleSelectAnswer(q.QuestionNo, 'C')} />
+                  <span>C. {q.OptionC || ""}</span>
+                </label>
+
+                {/* Part 2 TOEIC chỉ có 3 đáp án, nếu là Part 2 thì ẩn D đi */}
+                {(q.OptionD || Number(q.Part) !== 2) && (
                   <label className="option-label">
                     <input type="radio" name={`q-${q.QuestionNo}`} checked={answers[q.QuestionNo] === 'D'} onChange={() => handleSelectAnswer(q.QuestionNo, 'D')} />
-                    <span>D. {q.OptionD}</span>
+                    <span>D. {q.OptionD || ""}</span>
                   </label>
                 )}
               </div>
@@ -172,7 +172,6 @@ const TakingExam = () => {
         </div>
       </div>
 
-      {/* CỘT PHẢI: Bảng điều hướng câu hỏi */}
       <div className="exam-sidebar">
         <div className="timer-card">
           <h3>THỜI GIAN CÒN LẠI</h3>
@@ -189,7 +188,6 @@ const TakingExam = () => {
                        key={q.QuestionNo}
                        className={`q-box ${answers[q.QuestionNo] ? 'answered' : ''}`}
                        onClick={() => scrollToQuestion(q.QuestionNo)}
-                       title={answers[q.QuestionNo] ? `Đã chọn: ${answers[q.QuestionNo]}` : "Chưa làm"}
                     >
                        {q.QuestionNo}
                     </div>
