@@ -207,3 +207,56 @@
     position: static;
   }
 }
+/* --- GIAO DIỆN BẢNG ĐIỀU HƯỚNG CÂU HỎI THEO PART --- */
+.answer-sheet {
+  background-color: #fff;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  max-height: calc(100vh - 250px); /* Thanh cuộn nếu quá dài */
+  overflow-y: auto;
+}
+
+.part-section {
+  margin-bottom: 25px;
+}
+
+.part-heading {
+  font-size: 18px;
+  color: #333;
+  font-weight: bold;
+  margin-bottom: 12px;
+  text-align: left;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 5px;
+}
+
+.question-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr); /* Chia 5 cột y hệt ảnh */
+  gap: 8px;
+}
+
+.q-box {
+  border: 1px solid #333;
+  border-radius: 2px;
+  padding: 6px 0;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  background-color: #fff;
+  color: #333;
+  transition: all 0.2s ease;
+}
+
+.q-box:hover {
+  background-color: #e2e8f0;
+}
+
+/* Hiệu ứng khi câu hỏi ĐÃ ĐƯỢC CHỌN đáp án */
+.q-box.answered {
+  background-color: #0f4bcf; 
+  color: #fff;
+  border-color: #0f4bcf;
+}

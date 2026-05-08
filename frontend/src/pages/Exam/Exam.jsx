@@ -45,8 +45,13 @@ const Exam = () => {
       alert("Vui lòng chọn ít nhất 1 part để bắt đầu.");
       return;
     }
-    // TRUYỀN ID CỦA ĐỀ THI SANG TRANG LÀM BÀI
-    navigate("/taking-exam", { state: { examId: selectedExam } });
+    // TRUYỀN ID CỦA ĐỀ THI VÀ DANH SÁCH PART SANG TRANG LÀM BÀI
+    navigate("/taking-exam", { 
+      state: { 
+        examId: selectedExam,
+        selectedParts: Array.from(selectedParts) // Chuyển Set thành Array để truyền đi
+      } 
+    });
   };
 
   const handleBackToExams = () => {

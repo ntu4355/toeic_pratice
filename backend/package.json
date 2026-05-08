@@ -12,6 +12,7 @@
   "license": "ISC",
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
+    "adm-zip": "^0.5.17",
     "cors": "^x.x.x",
     "dotenv": "^x.x.x",
     "express": "^x.x.x",
