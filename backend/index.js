@@ -9,6 +9,7 @@ import { v2 as cloudinary } from 'cloudinary';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { GoogleAIFileManager } from '@google/generative-ai/server';
 import { PDFDocument } from 'pdf-lib';
+import mongoose from 'mongoose';
 
 dotenv.config();
 
@@ -17,6 +18,19 @@ const PORT = process.env.PORT || 5000;
 
 app.use(cors());
 app.use(express.json());
+
+// --- KẾT NỐI MONGODB ---
+mongoose.connect(process.env.MONGODB_URI)
+  .then(() => console.log('✅ Đã mở khóa Két sắt MongoDB thành công!'))
+  .catch(err => console.error('❌ Lỗi kết nối MongoDB:', err));
+
+// Định nghĩa Cấu trúc (Schema) của Đề thi trong Két sắt
+const examSchema = new mongoose.Schema({
+    name: String,
+    createdAt: { type: Date, default: Date.now },
+    questions: Array // Chứa danh sách câu hỏi AI tạo ra
+});
+const Exam = mongoose.model('Exam', examSchema);
 
 // --- CẤU HÌNH CLOUDINARY ---
 cloudinary.config({
@@ -35,7 +49,7 @@ const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 const PROMPT_TOEIC = `Bạn là chuyên gia TOEIC. Trích xuất CÂU HỎI TRẮC NGHIỆM từ file PDF đính kèm.
 BẮT BUỘC TRẢ VỀ DUY NHẤT 1 MẢNG JSON, KHÔNG CÓ BẤT KỲ VĂN BẢN NÀO BÊN NGOÀI.
-Cấu trúc: { "Part": int, "QuestionNo": int, "QuestionText": string, "OptionA": string, "OptionB": string, "OptionC": string, "OptionD": string, "CorrectAnswer": "", "ImageUrl": "" }`;
+Cấu trúc: [{ "Part": int, "QuestionNo": int, "QuestionText": string, "OptionA": string, "OptionB": string, "OptionC": string, "OptionD": string, "CorrectAnswer": "", "ImageUrl": "" }]`;
 
 // --- HÀM 1: CẮT NHỎ PDF ---
 async function splitPdfIntoChunks(pdfPath) {
@@ -79,7 +93,7 @@ async function processExamInBackground(pdfChunks, audioUrlMap, examName) {
                 displayName: `chunk_${i}.pdf` 
             });
             
-            const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+            const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
             const result = await model.generateContent([
                 { fileData: { mimeType: uploadResponse.file.mimeType, fileUri: uploadResponse.file.uri } },
                 { text: PROMPT_TOEIC }
@@ -105,8 +119,20 @@ async function processExamInBackground(pdfChunks, audioUrlMap, examName) {
     }
 
     console.log(`\n[Worker] 🎉 HOÀN TẤT BÓC TÁCH ĐỀ THI: ${examName}! Tổng số câu: ${finalQuestionsArray.length}`);
-    // Ở ĐÂY SẼ LÀ CODE LƯU VÀO MONGODB SAU NÀY
-    // Tạm thời log ra để bạn biết nó đã ráp nối thành công
+    
+    // --- CODE MỚI: LƯU VÀO MONGODB ---
+    if (finalQuestionsArray.length > 0) {
+        try {
+            const newExam = new Exam({
+                name: examName,
+                questions: finalQuestionsArray
+            });
+            await newExam.save(); // Hành động đóng két sắt lại
+            console.log(`[Worker] 💾 ĐÃ LƯU THÀNH CÔNG ĐỀ THI VÀO DATABASE! Sẵn sàng cho học viên thi.`);
+        } catch (dbError) {
+            console.error(`[Worker] ❌ Lỗi khi lưu vào Database:`, dbError.message);
+        }
+    }
 }
 
 
@@ -158,4 +184,16 @@ app.post('/api/upload-exam', uploadMany, async (req, res) => {
     }
 });
 
-app.listen(PORT, () => console.log(`🚀 Backend Ultimate Free chạy tại http://localhost:${PORT}`));
+// --- API: LẤY DANH SÁCH ĐỀ THI TỪ MONGODB ---
+app.get('/api/exams', async (req, res) => {
+    try {
+        // Lấy tất cả đề thi, sắp xếp theo thời gian mới nhất lên đầu
+        const exams = await Exam.find().sort({ createdAt: -1 });
+        res.json(exams);
+    } catch (error) {
+        console.error("Lỗi khi lấy đề thi:", error);
+        res.status(500).json({ message: "Lỗi máy chủ khi lấy đề thi" });
+    }
+});
+
+app.listen(PORT, () => console.log(`🚀 Backend tối ưu chạy tại http://localhost:${PORT}`));

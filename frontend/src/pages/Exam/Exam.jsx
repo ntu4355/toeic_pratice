@@ -19,10 +19,28 @@ const Exam = () => {
   const [selectedExam, setSelectedExam] = useState(null);
   const [selectedParts, setSelectedParts] = useState(() => new Set());
 
-  // Hook này lấy data trực tiếp từ localStorage, không còn nạp dữ liệu mẫu
+  // --- KÉO DỮ LIỆU TỪ MONGODB (BACKEND) ---
   useEffect(() => {
-    const storedExams = JSON.parse(localStorage.getItem("toeic_exams") || "[]");
-    setExamsList(storedExams);
+    const fetchExams = async () => {
+      try {
+        const response = await fetch("http://localhost:5000/api/exams");
+        const data = await response.json();
+        
+        // Chuyển đổi _id của MongoDB thành id để frontend dễ đọc
+        const formattedData = data.map(exam => ({
+          ...exam,
+          id: exam._id, 
+          // Mặc định thời gian thi nếu Database chưa có
+          duration: exam.duration || 120 
+        }));
+        
+        setExamsList(formattedData);
+      } catch (error) {
+        console.error("Lỗi khi kết nối với Backend:", error);
+      }
+    };
+
+    fetchExams();
   }, []);
 
   const togglePart = (id) => {

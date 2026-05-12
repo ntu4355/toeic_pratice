@@ -5,15 +5,14 @@ import "./TakingExam.css";
 const TakingExam = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const examId = location.state?.examId; 
-  
-  const selectedParts = location.state?.selectedParts || []; 
-  
+  const examId = location.state?.examId; // Lấy ID đề thi được truyền sang
+
   const [examInfo, setExamInfo] = useState(null);
   const [questions, setQuestions] = useState([]);
-  const [timeLeft, setTimeLeft] = useState(7200); 
+  const [timeLeft, setTimeLeft] = useState(7200);
   const [answers, setAnswers] = useState({});
 
+  // Kéo dữ liệu đề thi từ MONGODB (BACKEND) khi mở trang
   useEffect(() => {
     if (!examId) {
       alert("Không tìm thấy thông tin đề thi!");
@@ -21,35 +20,38 @@ const TakingExam = () => {
       return;
     }
 
-    const storedExams = JSON.parse(localStorage.getItem("toeic_exams") || "[]");
-    const currentExam = storedExams.find(e => e.id === examId);
-
-    if (currentExam) {
-      setExamInfo(currentExam);
-      setTimeLeft(currentExam.duration * 60);
-      
-      if (currentExam.examData && currentExam.examData.length > 0) {
-        let finalQuestions = currentExam.examData;
+    const fetchExamData = async () => {
+      try {
+        const response = await fetch("http://localhost:5000/api/exams");
+        const data = await response.json();
         
-        if (selectedParts && selectedParts.length > 0) {
-          finalQuestions = finalQuestions.filter(q => 
-            selectedParts.map(Number).includes(Number(q.Part))
-          );
-        }
+        // Tìm đề thi có _id (trong MongoDB) khớp với examId
+        const currentExam = data.find(e => e._id === examId);
 
-        if (finalQuestions.length === 0) {
-          alert("Không có câu hỏi nào thuộc các Part bạn vừa chọn. Vui lòng chọn lại!");
+        if (currentExam) {
+          setExamInfo(currentExam);
+          // Gán thời gian làm bài (phút -> giây), mặc định 120 phút nếu không có
+          setTimeLeft((currentExam.duration || 120) * 60);
+          
+          // Lấy danh sách câu hỏi AI đã bóc tách
+          if (currentExam.questions && currentExam.questions.length > 0) {
+            setQuestions(currentExam.questions);
+          } else {
+            alert("Đề thi này chưa có dữ liệu câu hỏi!");
+          }
+        } else {
+          alert("Không tìm thấy đề thi trong Database!");
           navigate("/exam");
-          return;
         }
-        
-        setQuestions(finalQuestions);
-      } else {
-        alert("Đề thi này chưa có file dữ liệu câu hỏi!");
+      } catch (error) {
+        console.error("Lỗi khi kết nối Backend:", error);
       }
-    }
-  }, [examId, navigate, selectedParts]); 
+    };
 
+    fetchExamData();
+  }, [examId, navigate]);
+
+  // Logic đồng hồ đếm ngược
   useEffect(() => {
     if (timeLeft <= 0) {
       handleAutoSubmit();
@@ -68,12 +70,15 @@ const TakingExam = () => {
   };
 
   const handleSelectAnswer = (questionNo, optionLetter) => {
-    setAnswers((prev) => ({ ...prev, [questionNo]: optionLetter }));
+    setAnswers((prev) => ({
+      ...prev,
+      [questionNo]: optionLetter,
+    }));
   };
 
   const handleAutoSubmit = () => {
     alert("Hết giờ làm bài! Hệ thống đang tự động thu bài...");
-    navigate("/"); 
+    navigate("/");
   };
 
   const handleManualSubmit = () => {
@@ -81,125 +86,112 @@ const TakingExam = () => {
     if (isConfirm) {
       console.log("Đáp án học viên chọn:", answers);
       alert("Nộp bài thành công! Chúng ta sẽ làm phần chấm điểm sau.");
-      navigate("/exam"); 
+      navigate("/exam");
     }
   };
 
-  const scrollToQuestion = (questionNo) => {
-    const element = document.getElementById(`question-${questionNo}`);
+  // Hàm click để cuộn đến câu hỏi
+  const scrollToQuestion = (qId) => {
+    const element = document.getElementById(`question-${qId}`);
     if (element) {
       element.scrollIntoView({ behavior: "smooth", block: "center" });
     }
   };
 
-  const groupedQuestions = questions.reduce((acc, curr) => {
-    if (!acc[curr.Part]) {
-      acc[curr.Part] = [];
-    }
-    acc[curr.Part].push(curr);
-    return acc;
-  }, {});
-
   if (!examInfo || questions.length === 0) {
     return <div style={{textAlign: "center", padding: "50px"}}>Đang tải dữ liệu bài thi...</div>;
   }
 
+  // Phân loại câu hỏi theo Part để render
+  const groupedQuestions = questions.reduce((acc, q) => {
+    if (!acc[q.Part]) acc[q.Part] = [];
+    acc[q.Part].push(q);
+    return acc;
+  }, {});
+
   return (
-    <div className="taking-exam">
-      <div className="exam-content">
-        <h2 style={{color: "#0f2f6d", marginBottom: "20px"}}>{examInfo.name}</h2>
-        
-        <div className="questions-list">
-          {questions.map((q) => (
-            <div key={q.QuestionNo} id={`question-${q.QuestionNo}`} className="question-block">
-              
-              {/* 1. Số thứ tự và nội dung câu hỏi */}
-              <div className="question-text">
-                <span style={{fontWeight: "bold", marginRight: "8px"}}>{q.QuestionNo}.</span> 
-                {q.QuestionText}
-              </div>
-              
-              {/* 2. AUDIO PLAYER */}
-              {q.AudioUrl && (
-                <div className="question-audio-wrapper" style={{
-                  margin: "15px 0", padding: "8px 15px", backgroundColor: "#f1f5f9",
-                  borderRadius: "50px", display: "flex", alignItems: "center", border: "1px solid #e2e8f0"
-                }}>
-                  <audio controls controlsList="nodownload" style={{ width: "100%", height: "35px", outline: "none" }}>
-                    <source src={q.AudioUrl} type="audio/mpeg" />
-                    Trình duyệt của bạn không hỗ trợ phát âm thanh.
-                  </audio>
-                </div>
-              )}
-
-              {/* 3. HÌNH ẢNH (Part 1) */}
-              {q.ImageUrl && (
-                <div className="question-image" style={{ margin: "15px 0", textAlign: "center" }}>
-                  <img 
-                    src={q.ImageUrl} alt={`Hình ảnh câu ${q.QuestionNo}`} 
-                    style={{ maxWidth: "100%", maxHeight: "400px", objectFit: "contain", borderRadius: "8px", border: "1px solid #dee2e6", boxShadow: "0 2px 4px rgba(0,0,0,0.05)" }} 
-                  />
-                </div>
-              )}
-
-              {/* 4. ĐÁP ÁN (ĐÃ ĐƯỢC FIX ĐỂ LUÔN HIỂN THỊ) */}
-              <div className="options-grid">
-                <label className="option-label">
-                  <input type="radio" name={`q-${q.QuestionNo}`} checked={answers[q.QuestionNo] === 'A'} onChange={() => handleSelectAnswer(q.QuestionNo, 'A')} />
-                  <span>A. {q.OptionA || ""}</span>
-                </label>
-
-                <label className="option-label">
-                  <input type="radio" name={`q-${q.QuestionNo}`} checked={answers[q.QuestionNo] === 'B'} onChange={() => handleSelectAnswer(q.QuestionNo, 'B')} />
-                  <span>B. {q.OptionB || ""}</span>
-                </label>
-
-                <label className="option-label">
-                  <input type="radio" name={`q-${q.QuestionNo}`} checked={answers[q.QuestionNo] === 'C'} onChange={() => handleSelectAnswer(q.QuestionNo, 'C')} />
-                  <span>C. {q.OptionC || ""}</span>
-                </label>
-
-                {/* Part 2 TOEIC chỉ có 3 đáp án, nếu là Part 2 thì ẩn D đi */}
-                {(q.OptionD || Number(q.Part) !== 2) && (
-                  <label className="option-label">
-                    <input type="radio" name={`q-${q.QuestionNo}`} checked={answers[q.QuestionNo] === 'D'} onChange={() => handleSelectAnswer(q.QuestionNo, 'D')} />
-                    <span>D. {q.OptionD || ""}</span>
-                  </label>
-                )}
-              </div>
+    <div className="taking-exam-container">
+      {/* Cột trái: Nội dung bài thi */}
+      <div className="exam-content-col">
+        <div className="exam-header-sticky">
+            <h2 style={{color: "#0f2f6d", margin: "0", marginBottom: "10px"}}>{examInfo.name}</h2>
+            {/* Giả lập Audio Player */}
+            <div className="audio-player-mock">
+                <button className="play-btn">▶</button>
+                <div className="progress-bar"><div className="progress"></div></div>
+                <span style={{color: '#0f4bcf', fontWeight: '600'}}>00:00 / {examInfo.duration || 120}:00</span>
             </div>
+        </div>
+        
+        <div className="questions-scroll-area">
+          {Object.keys(groupedQuestions).map((part) => (
+             <div key={part} className="part-section">
+                <h3 style={{color: "#e53e3e", borderBottom: "2px solid #e53e3e", paddingBottom: "10px"}}>
+                  Part {part}
+                </h3>
+                {groupedQuestions[part].map((q, index) => (
+                  <div key={index} id={`question-${q.QuestionNo}`} className="question-item" style={{marginBottom: "30px", background: "#fff", padding: "20px", borderRadius: "8px", boxShadow: "0 2px 10px rgba(0,0,0,0.05)"}}>
+                    <p style={{fontSize: "16px", fontWeight: "500"}}><strong>Câu {q.QuestionNo}:</strong> {q.QuestionText}</p>
+                    
+                    {/* Nếu có ảnh thì hiển thị */}
+                    {q.ImageUrl && (
+                      <div style={{margin: "15px 0"}}>
+                        <img src={q.ImageUrl} alt={`Minh họa câu ${q.QuestionNo}`} style={{maxWidth: "100%", borderRadius: "8px"}} />
+                      </div>
+                    )}
+
+                    <div className="options-list" style={{display: "flex", flexDirection: "column", gap: "10px", marginTop: "15px"}}>
+                       {['A', 'B', 'C', 'D'].map((opt) => (
+                         q[`Option${opt}`] ? (
+                            <label key={opt} className="option-label" style={{display: "flex", alignItems: "center", gap: "10px", cursor: "pointer"}}>
+                                <input 
+                                  type="radio" 
+                                  name={`question-${q.QuestionNo}`} 
+                                  checked={answers[q.QuestionNo] === opt}
+                                  onChange={() => handleSelectAnswer(q.QuestionNo, opt)}
+                                  style={{transform: "scale(1.2)"}}
+                                />
+                                <span><strong>{opt}.</strong> {q[`Option${opt}`]}</span>
+                            </label>
+                         ) : null
+                       ))}
+                    </div>
+                  </div>
+                ))}
+             </div>
           ))}
         </div>
       </div>
 
-      <div className="exam-sidebar">
-        <div className="timer-card">
-          <h3>THỜI GIAN CÒN LẠI</h3>
-          <div className="time-display">{formatTime(timeLeft)}</div>
+      {/* Cột phải: Sidebar đếm ngược và phiếu trả lời */}
+      <div className="exam-sidebar-col">
+        <div className="timer-box">
+            <h4 style={{textAlign: "center"}}>THỜI GIAN CÒN LẠI</h4>
+            <div className="time-display" style={{fontSize: "32px", fontWeight: "bold", textAlign: "center", color: "#e53e3e", margin: "10px 0"}}>{formatTime(timeLeft)}</div>
+            <button className="submit-btn" onClick={handleManualSubmit} style={{width: "100%", padding: "12px", background: "#0f4bcf", color: "#fff", border: "none", borderRadius: "8px", fontSize: "16px", cursor: "pointer"}}>Nộp bài ngay</button>
         </div>
 
-        <div className="answer-sheet">
-          {Object.keys(groupedQuestions).sort((a,b) => a - b).map(part => (
-            <div key={part} className="part-section">
-               <h3 className="part-heading">Part {part}</h3>
-               <div className="question-grid">
-                 {groupedQuestions[part].map(q => (
-                    <div
-                       key={q.QuestionNo}
-                       className={`q-box ${answers[q.QuestionNo] ? 'answered' : ''}`}
-                       onClick={() => scrollToQuestion(q.QuestionNo)}
-                    >
-                       {q.QuestionNo}
-                    </div>
-                 ))}
-               </div>
+        <div className="navigation-box" style={{marginTop: "20px", background: "#fff", padding: "15px", borderRadius: "10px", boxShadow: "0 2px 10px rgba(0,0,0,0.1)"}}>
+            <h4 style={{textAlign: "center", borderBottom: "1px solid #ddd", paddingBottom: "10px"}}>BẢNG CÂU HỎI</h4>
+            <div style={{maxHeight: "500px", overflowY: "auto", paddingRight: "5px"}}>
+              {Object.keys(groupedQuestions).map(part => (
+                  <div key={part} className="nav-part-group" style={{marginTop: "15px"}}>
+                      <h5 style={{marginBottom: "10px", color: "#555"}}>Part {part}</h5>
+                      <div className="question-grid">
+                          {groupedQuestions[part].map(q => (
+                              <div 
+                                  key={q.QuestionNo} 
+                                  className={`q-box ${answers[q.QuestionNo] ? 'answered' : ''}`}
+                                  onClick={() => scrollToQuestion(q.QuestionNo)}
+                              >
+                                  {q.QuestionNo}
+                              </div>
+                          ))}
+                      </div>
+                  </div>
+              ))}
             </div>
-          ))}
         </div>
-
-        <button className="submit-exam-btn" onClick={handleManualSubmit}>
-          Nộp bài ngay
-        </button>
       </div>
     </div>
   );
