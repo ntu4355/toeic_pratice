@@ -1,8 +1,7 @@
 import "./Login.css";
 import { assets } from "../../assets/assets";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
-const STORAGE_KEY = "toeic_users";
 const LOGIN_STATE = "Đăng nhập";
 const REGISTER_STATE = "Đăng ký";
 
@@ -26,20 +25,6 @@ const DEFAULT_USERS = [
   },
 ];
 
-const loadUsers = () => {
-  try {
-    // Luôn khởi tạo DEFAULT_USERS (reset localStorage)
-    saveUsers(DEFAULT_USERS);
-    return DEFAULT_USERS;
-  } catch {
-    return DEFAULT_USERS;
-  }
-};
-
-const saveUsers = (users) => {
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(users));
-};
-
 const Login = ({ setShowLogin, setCurrentUser }) => {
   const [currState, setCurrState] = useState(LOGIN_STATE);
   const [fullName, setFullName] = useState("");
@@ -50,6 +35,32 @@ const Login = ({ setShowLogin, setCurrentUser }) => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+
+  // ==============================================================
+  // MA THUẬT NGẦM: TỰ ĐỘNG ĐẨY TÀI KHOẢN MẪU VÀO MONGODB KHI MỞ BẢNG
+  // ==============================================================
+  useEffect(() => {
+    const seedMockUsers = async () => {
+      for (const user of DEFAULT_USERS) {
+        try {
+          await fetch("http://localhost:5000/api/register", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name: user.fullName,
+              email: user.email,
+              password: user.password,
+              role: user.role
+            }),
+          });
+          // Nếu Backend báo lỗi 400 (Email đã tồn tại) thì cứ bỏ qua ngầm
+        } catch (error) {
+          console.error("Lỗi khi tạo tài khoản mẫu:", error);
+        }
+      }
+    };
+    seedMockUsers();
+  }, []);
 
   const resetForm = () => {
     setFullName("");
@@ -62,7 +73,7 @@ const Login = ({ setShowLogin, setCurrentUser }) => {
     setMessage("");
   };
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
     setError("");
     setMessage("");
@@ -72,81 +83,88 @@ const Login = ({ setShowLogin, setCurrentUser }) => {
       return;
     }
 
-    const users = loadUsers();
     const normalizedEmail = email.trim().toLowerCase();
 
+    // ==========================================
+    // 1. LUỒNG ĐĂNG NHẬP (Gọi MongoDB)
+    // ==========================================
     if (currState === LOGIN_STATE) {
-      const foundUser = users.find(
-        (user) => user.email === normalizedEmail && user.password === password,
-      );
-      if (!foundUser) {
-        setError("Email hoặc mật khẩu không đúng.");
+      try {
+        const response = await fetch("http://localhost:5000/api/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: normalizedEmail, password }),
+        });
+        
+        const data = await response.json();
+
+        if (response.ok) {
+          // Lưu token bảo mật
+          localStorage.setItem("token", data.token);
+          
+          // Gán State cho App.jsx, giữ nguyên các trường như cũ
+          setCurrentUser({
+            fullName: data.user.name,
+            username: data.user.name, // Mượn tạm name làm username để không vỡ UI cũ
+            email: data.user.email,
+            role: data.user.role,
+          });
+          setShowLogin(false);
+          return;
+        } else {
+          setError(data.message || "Email hoặc mật khẩu không đúng.");
+          return;
+        }
+      } catch (err) {
+        setError("Lỗi kết nối đến máy chủ Database.");
         return;
       }
-
-      setCurrentUser({
-        fullName: foundUser.fullName,
-        username: foundUser.username,
-        email: foundUser.email,
-        role: foundUser.role,
-      });
-      setShowLogin(false);
-      return;
     }
 
-    // Đăng ký mới
+    // ==========================================
+    // 2. LUỒNG ĐĂNG KÝ (Gọi MongoDB)
+    // ==========================================
     if (!fullName.trim()) {
-      setError("Vui lòng nhập họ và tên.");
-      return;
+      setError("Vui lòng nhập họ và tên."); return;
     }
     if (!username.trim()) {
-      setError("Vui lòng nhập tên đăng nhập.");
-      return;
+      setError("Vui lòng nhập tên đăng nhập."); return;
     }
     if (!phone.trim()) {
-      setError("Vui lòng nhập số điện thoại.");
-      return;
+      setError("Vui lòng nhập số điện thoại."); return;
     }
     if (!confirmPassword.trim()) {
-      setError("Vui lòng nhập lại mật khẩu.");
-      return;
+      setError("Vui lòng nhập lại mật khẩu."); return;
     }
     if (password !== confirmPassword) {
-      setError("Mật khẩu và xác nhận mật khẩu không khớp.");
-      return;
+      setError("Mật khẩu và xác nhận mật khẩu không khớp."); return;
     }
 
-    const existingEmail = users.find((user) => user.email === normalizedEmail);
-    if (existingEmail) {
-      setError("Email này đã được sử dụng. Vui lòng thử email khác.");
-      return;
-    }
-    const existingUsername = users.find(
-      (user) => user.username.toLowerCase() === username.trim().toLowerCase(),
-    );
-    if (existingUsername) {
-      setError("Tên đăng nhập này đã tồn tại. Vui lòng chọn tên khác.");
-      return;
-    }
+    try {
+      const response = await fetch("http://localhost:5000/api/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: fullName.trim(),
+          email: normalizedEmail,
+          password: password,
+          role: "user" 
+        }),
+      });
 
-    const newUser = {
-      fullName: fullName.trim(),
-      username: username.trim(),
-      phone: phone.trim(),
-      email: normalizedEmail,
-      password,
-      role: "user",
-    };
+      const data = await response.json();
 
-    saveUsers([...users, newUser]);
-    setCurrentUser({
-      fullName: newUser.fullName,
-      username: newUser.username,
-      email: newUser.email,
-      role: newUser.role,
-    });
-    setMessage("Tạo tài khoản thành công. Bạn đã đăng nhập.");
-    setShowLogin(false);
+      if (response.ok) {
+        setMessage("Tạo tài khoản thành công. Bạn đã có thể đăng nhập.");
+        setCurrState(LOGIN_STATE);
+        setPassword("");
+        setConfirmPassword("");
+      } else {
+        setError(data.message || "Email này đã được sử dụng. Vui lòng thử email khác.");
+      }
+    } catch (err) {
+      setError("Lỗi kết nối đến máy chủ Database.");
+    }
   };
 
   const toggleState = () => {

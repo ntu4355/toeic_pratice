@@ -1,285 +1,265 @@
-import "./AdminDashboard.css";
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import CreateExam from "../CreateExam/CreateExam";
+import React, { useState, useEffect } from 'react';
+import './AdminDashboard.css';
+import CreateExam from '../CreateExam/CreateExam';
 
 const AdminDashboard = ({ currentUser }) => {
-  const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState("overview");
-  
-  // State lưu dữ liệu thực tế
+  const [activeTab, setActiveTab] = useState('overview');
   const [exams, setExams] = useState([]);
   const [users, setUsers] = useState([]);
-
-  // State quản lý việc Edit đề thi
   const [editingExam, setEditingExam] = useState(null);
 
-  // Kéo dữ liệu từ localStorage mỗi khi chuyển tab
-  useEffect(() => {
-    if (activeTab === "overview" || activeTab === "manage") {
-      const storedExams = JSON.parse(localStorage.getItem("toeic_exams") || "[]");
-      setExams(storedExams);
+  // Kéo dữ liệu đề thi từ MongoDB
+  const fetchExams = async () => {
+    try {
+      const response = await fetch('http://localhost:5000/api/exams');
+      const data = await response.json();
+      setExams(data);
+    } catch (error) {
+      console.error("Lỗi khi tải danh sách đề thi:", error);
     }
-    if (activeTab === "users") {
-      const storedUsers = JSON.parse(localStorage.getItem("toeic_users") || "[]");
-      setUsers(storedUsers);
+  };
+  
+  // LOGIC MỚI: Kéo dữ liệu người dùng từ MongoDB (Thay thế localStorage)
+  const fetchUsers = async () => {
+    try {
+      const response = await fetch('http://localhost:5000/api/users');
+      const data = await response.json();
+      setUsers(data);
+    } catch (error) {
+      console.error("Lỗi khi tải danh sách người dùng:", error);
     }
-  }, [activeTab]);
+  };
 
-  if (!currentUser || currentUser.role !== "admin") {
+  useEffect(() => {
+    fetchExams();
+    fetchUsers(); // Gọi thẳng lên Backend để lấy User thật
+  }, []);
+
+  if (!currentUser || currentUser.role !== 'admin') {
     return (
-      <div className="access-denied">
-        <div className="denied-content">
-          <h2>🔒 Truy cập bị từ chối</h2>
-          <p>Chỉ admin mới có thể truy cập trang này.</p>
-          <button className="btn-home" onClick={() => navigate("/")}>
-            ← Quay lại trang chủ
-          </button>
-        </div>
+      <div className="admin-access-denied">
+        <h2>🛑 Quyền truy cập bị từ chối</h2>
+        <p>Bạn cần đăng nhập bằng tài khoản Quản trị viên để xem trang này.</p>
       </div>
     );
   }
 
-  // ==== CÁC HÀM XỬ LÝ QUẢN LÝ ĐỀ THI ====
-
-  // Xóa đề thi
-  const handleDeleteExam = (id) => {
-    const isConfirm = window.confirm("Bạn có chắc chắn muốn xóa đề thi này không? Hành động này không thể hoàn tác.");
-    if (isConfirm) {
-      // Lọc bỏ đề thi có id trùng khớp
-      const updatedExams = exams.filter((exam) => exam.id !== id);
-      setExams(updatedExams);
-      // Lưu lại vào localStorage
-      localStorage.setItem("toeic_exams", JSON.stringify(updatedExams));
+  const handleDeleteExam = async (id) => {
+    if (window.confirm("Bạn có chắc chắn muốn xóa đề thi này không? Dữ liệu sẽ mất vĩnh viễn!")) {
+      try {
+        const response = await fetch(`http://localhost:5000/api/exams/${id}`, { method: 'DELETE' });
+        if (response.ok) {
+          alert("Xóa thành công!");
+          fetchExams(); 
+        } else {
+          alert("Có lỗi xảy ra khi xóa!");
+        }
+      } catch (error) {
+        console.error("Lỗi xóa đề:", error);
+      }
     }
   };
 
-  // Mở modal sửa đề
-  const handleEditClick = (exam) => {
-    setEditingExam(exam);
-  };
-
-  // Xử lý thay đổi dữ liệu trong form sửa
-  const handleEditChange = (e) => {
-    const { name, value } = e.target;
-    setEditingExam((prev) => ({
-      ...prev,
-      [name]: name === "duration" || name === "parts" ? parseInt(value) || 0 : value,
-    }));
-  };
-
-  // Lưu đề thi đã sửa
-  const handleSaveEdit = (e) => {
+  const handleSaveEdit = async (e) => {
     e.preventDefault();
-    // Tính lại số câu hỏi dựa trên số parts
-    const questionsCount = editingExam.parts === 7 ? 200 : 100;
-    const finalUpdatedExam = { ...editingExam, questions: questionsCount };
+    try {
+      const response = await fetch(`http://localhost:5000/api/exams/${editingExam._id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: editingExam.name, duration: editingExam.duration }),
+      });
 
-    // Cập nhật lại mảng exams
-    const updatedExams = exams.map((exam) =>
-      exam.id === editingExam.id ? finalUpdatedExam : exam
-    );
-
-    setExams(updatedExams);
-    localStorage.setItem("toeic_exams", JSON.stringify(updatedExams));
-    setEditingExam(null); // Đóng modal
-    alert("Đã cập nhật thông tin đề thi thành công!");
+      if (response.ok) {
+        alert("Đã cập nhật thông tin đề thi!");
+        setEditingExam(null); 
+        fetchExams(); 
+      } else {
+        alert("Có lỗi xảy ra khi cập nhật!");
+      }
+    } catch (error) {
+      console.error("Lỗi cập nhật đề:", error);
+    }
   };
-
-  // ======================================
-
-  const stats = [
-    { id: 1, title: "Tổng Đề Thi", value: exams.length, icon: "📋", color: "blue" },
-    { id: 2, title: "Người Dùng", value: users.length > 0 ? users.length : 2, icon: "👥", color: "green" },
-    { id: 3, title: "Bài Tập Hoàn Thành", value: 0, icon: "✅", color: "purple" },
-    { id: 4, title: "Lượt Truy Cập", value: 124, icon: "📊", color: "orange" },
-  ];
 
   return (
-    <div className="admin-dashboard">
-      <div className="admin-header">
-        <div className="admin-header-content">
+    <div className="admin-dashboard-horizontal">
+      
+      {/* BANNER PHÍA TRÊN */}
+      <div className="admin-banner-gradient">
+        <div className="admin-banner-content">
           <h1>👨‍💼 Admin Dashboard</h1>
-          <p>Chào mừng, {currentUser.fullName}</p>
+          <p>Chào mừng, {currentUser?.name || "Admin TOEIC"}</p>
         </div>
       </div>
 
-      <div className="dashboard-container">
-        <div className="dashboard-tabs">
-          <button className={`tab-btn ${activeTab === "overview" ? "active" : ""}`} onClick={() => setActiveTab("overview")}>📊 Tổng Quan</button>
-          <button className={`tab-btn ${activeTab === "create" ? "active" : ""}`} onClick={() => setActiveTab("create")}>➕ Tạo Đề Thi</button>
-          <button className={`tab-btn ${activeTab === "manage" ? "active" : ""}`} onClick={() => setActiveTab("manage")}>📝 Quản Lý Đề</button>
-          <button className={`tab-btn ${activeTab === "users" ? "active" : ""}`} onClick={() => setActiveTab("users")}>👥 Quản Lý User</button>
-        </div>
+      {/* THANH MENU NGANG (TABS) */}
+      <div className="admin-tabs-row">
+        <button className={`tab-btn ${activeTab === 'overview' ? 'active' : ''}`} onClick={() => setActiveTab('overview')}>
+          📊 Tổng Quan
+        </button>
+        <button className={`tab-btn ${activeTab === 'createExam' ? 'active' : ''}`} onClick={() => setActiveTab('createExam')}>
+          ➕ Tạo Đề Thi
+        </button>
+        <button className={`tab-btn ${activeTab === 'manageExams' ? 'active' : ''}`} onClick={() => { setActiveTab('manageExams'); fetchExams(); }}>
+          📁 Quản Lý Đề
+        </button>
+        <button className={`tab-btn ${activeTab === 'users' ? 'active' : ''}`} onClick={() => { setActiveTab('users'); fetchUsers(); }}>
+          👥 Quản Lý User
+        </button>
+      </div>
 
-        <div className="dashboard-content">
-          {/* TAB TỔNG QUAN */}
-          {activeTab === "overview" && (
-            <div className="overview-section">
-              <div className="stats-grid">
-                {stats.map((stat) => (
-                  <div key={stat.id} className={`stat-card stat-${stat.color}`}>
-                    <div className="stat-icon">{stat.icon}</div>
-                    <div className="stat-info">
-                      <h3>{stat.value}</h3>
-                      <p>{stat.title}</p>
-                    </div>
-                  </div>
-                ))}
+      {/* KHU VỰC NỘI DUNG */}
+      <div className="admin-content-area">
+        
+        {/* TAB 1: TỔNG QUAN */}
+        {activeTab === 'overview' && (
+          <div className="tab-overview-horizontal">
+            {/* 4 Thẻ màu Gradient */}
+            <div className="color-cards-grid">
+              <div className="color-card card-purple">
+                <div className="card-icon">📋</div>
+                <div className="card-info">
+                  <h3>{exams.length}</h3>
+                  <p>Tổng Đề Thi</p>
+                </div>
+              </div>
+              
+              <div className="color-card card-pink">
+                <div className="card-icon">👥</div>
+                <div className="card-info">
+                  <h3>{users.length}</h3>
+                  <p>Người Dùng</p>
+                </div>
               </div>
 
-              <div className="overview-grid">
-                <div className="overview-box">
-                  <h3>📋 Đề Thi Gần Đây</h3>
-                  <div className="exams-list">
-                    {exams.slice(0, 5).map((exam) => (
-                      <div key={exam.id} className="exam-row">
-                        <div className="exam-info">
-                          <p className="exam-name">{exam.name}</p>
-                          <span className="exam-meta">{exam.parts} phần | {exam.questions} câu</span>
-                        </div>
-                        <span className="exam-date">{exam.created || "Mới"}</span>
-                      </div>
-                    ))}
-                    {exams.length === 0 && <p style={{color: '#666'}}>Chưa có đề thi nào.</p>}
-                  </div>
+              <div className="color-card card-cyan">
+                <div className="card-icon">✅</div>
+                <div className="card-info">
+                  <h3>0</h3>
+                  <p>Bài Tập Hoàn Thành</p>
                 </div>
+              </div>
 
-                <div className="overview-box">
-                  <h3>📈 Thống Kê Hôm Nay</h3>
-                  <div className="stats-list">
-                    <div className="stat-item"><span>User mới:</span><strong>{users.length}</strong></div>
-                    <div className="stat-item"><span>Đề thi mới:</span><strong>{exams.length}</strong></div>
-                  </div>
+              <div className="color-card card-yellow">
+                <div className="card-icon">📊</div>
+                <div className="card-info">
+                  <h3>124</h3>
+                  <p>Lượt Truy Cập</p>
                 </div>
               </div>
             </div>
-          )}
 
-          {/* TAB TẠO ĐỀ THI */}
-          {activeTab === "create" && (
-            <div className="create-section">
-              <CreateExam currentUser={currentUser} />
-            </div>
-          )}
-
-          {/* TAB QUẢN LÝ ĐỀ THI */}
-          {activeTab === "manage" && (
-            <div className="manage-section">
-              <div className="manage-header">
-                <h2>Quản Lý Đề Thi</h2>
-                <button className="btn-add" onClick={() => setActiveTab("create")}>+ Thêm Đề</button>
+            {/* 2 Khung nội dung bên dưới */}
+            <div className="bottom-widgets-row">
+              <div className="widget-box">
+                <h4 className="widget-title">📑 Đề Thi Gần Đây</h4>
+                {exams.length === 0 ? (
+                   <p className="widget-empty">Chưa có đề thi nào.</p>
+                ) : (
+                   <ul className="widget-list">
+                     {exams.slice(0, 3).map(ex => (
+                       <li key={ex._id}>{ex.name}</li>
+                     ))}
+                   </ul>
+                )}
               </div>
+              <div className="widget-box">
+                <h4 className="widget-title">📈 Thống Kê Hôm Nay</h4>
+                <div className="stat-line">
+                  <span>User mới:</span> <strong>0</strong>
+                </div>
+                <div className="stat-line">
+                  <span>Đề thi mới:</span> <strong>0</strong>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
-              <table className="manage-table">
+        {/* CÁC TAB KHÁC GIỮ NGUYÊN LOGIC */}
+        {activeTab === 'createExam' && <div className="tab-section"><CreateExam /></div>}
+
+        {activeTab === 'manageExams' && (
+          <div className="tab-section">
+            <h2 style={{color: '#5b51d8'}}>Danh sách Đề thi</h2>
+            {exams.length === 0 ? (
+              <p>Chưa có đề thi nào trong Database.</p>
+            ) : (
+              <table className="admin-table">
                 <thead>
                   <tr>
-                    <th>Tên Đề Thi</th>
-                    <th>Part</th>
-                    <th>Câu Hỏi</th>
+                    <th>Tên đề thi</th>
                     <th>Thời gian</th>
-                    <th>Ngày Tạo</th>
-                    <th>Thao Tác</th>
+                    <th>Tổng số câu</th>
+                    <th>Hành động</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {exams.map((exam) => (
-                    <tr key={exam.id}>
-                      <td>{exam.name}</td>
-                      <td>{exam.parts}</td>
-                      <td>{exam.questions}</td>
+                  {exams.map(exam => (
+                    <tr key={exam._id}>
+                      <td style={{fontWeight: 'bold', color: '#333'}}>{exam.name}</td>
                       <td>{exam.duration} phút</td>
-                      <td>{exam.created || "Mặc định"}</td>
-                      <td className="actions">
-                        <button className="btn-edit" onClick={() => handleEditClick(exam)}>✏️ Sửa</button>
-                        <button className="btn-delete" onClick={() => handleDeleteExam(exam.id)}>🗑️ Xóa</button>
+                      <td><span className="badge-blue">{exam.questions?.length || 0} câu</span></td>
+                      <td>
+                        <button className="btn-edit" onClick={() => setEditingExam(exam)}>Sửa</button>
+                        <button className="btn-delete" onClick={() => handleDeleteExam(exam._id)}>Xóa</button>
                       </td>
                     </tr>
                   ))}
-                  {exams.length === 0 && (
-                    <tr>
-                      <td colSpan="6" style={{textAlign: "center", padding: "20px"}}>Chưa có đề thi nào.</td>
-                    </tr>
-                  )}
                 </tbody>
               </table>
+            )}
+          </div>
+        )}
 
-              {/* MODAL CHỈNH SỬA ĐỀ THI */}
-              {editingExam && (
-                <div className="modal-overlay">
-                  <div className="modal-content">
-                    <h3>Chỉnh Sửa Đề Thi</h3>
-                    <form className="modal-form" onSubmit={handleSaveEdit}>
-                      <div className="form-group">
-                        <label>Tên Đề Thi</label>
-                        <input
-                          type="text"
-                          name="name"
-                          value={editingExam.name}
-                          onChange={handleEditChange}
-                          required
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label>Thời gian (phút)</label>
-                        <input
-                          type="number"
-                          name="duration"
-                          value={editingExam.duration}
-                          onChange={handleEditChange}
-                          required
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label>Số lượng Part</label>
-                        <select
-                          name="parts"
-                          value={editingExam.parts}
-                          onChange={handleEditChange}
-                        >
-                          <option value="7">7 Parts (200 câu)</option>
-                          <option value="4">4 Parts (100 câu)</option>
-                          <option value="3">3 Parts (100 câu)</option>
-                        </select>
-                      </div>
-                      
-                      <div className="modal-actions">
-                        <button type="button" className="btn-cancel-modal" onClick={() => setEditingExam(null)}>
-                          Hủy
-                        </button>
-                        <button type="submit" className="btn-save-modal">
-                          Lưu Thay Đổi
-                        </button>
-                      </div>
-                    </form>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* TAB QUẢN LÝ USER */}
-          {activeTab === "users" && (
-            <div className="users-section">
-              <h2>Quản Lý Người Dùng</h2>
-              <div className="users-list">
-                {users.map((user, idx) => (
-                   <div key={idx} className="user-card">
-                   <div className="user-avatar">👤</div>
-                   <div className="user-info">
-                     <h4>{user.fullName}</h4>
-                     <p>{user.email}</p>
-                     <span className="user-role">{user.role}</span>
-                   </div>
-                   <button className="btn-action">⋮</button>
-                 </div>
-                ))}
-                {users.length === 0 && <p>Chưa có dữ liệu người dùng.</p>}
-              </div>
-            </div>
-          )}
-        </div>
+        {activeTab === 'users' && (
+          <div className="tab-section">
+            <h2 style={{color: '#5b51d8'}}>Danh sách Người dùng</h2>
+            {users.length === 0 ? (
+              <p>Chưa có người dùng nào trong Database.</p>
+            ) : (
+              <table className="admin-table">
+                <thead>
+                  <tr><th>Tên hiển thị</th><th>Email</th><th>Quyền (Role)</th></tr>
+                </thead>
+                <tbody>
+                  {users.map((user) => (
+                    <tr key={user._id}>
+                      <td>{user.name}</td>
+                      <td>{user.email}</td>
+                      <td><span className={`role-badge ${user.role}`}>{user.role === 'admin' ? 'Quản trị viên' : 'Học viên'}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
       </div>
+
+      {/* LỚP PHỦ MODAL CHỈNH SỬA ĐỀ THI */}
+      {editingExam && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h3 style={{color: '#5b51d8'}}>Chỉnh sửa Đề Thi</h3>
+            <form onSubmit={handleSaveEdit}>
+              <div className="form-group">
+                <label>Tên Đề Thi</label>
+                <input type="text" value={editingExam.name} onChange={e => setEditingExam({...editingExam, name: e.target.value})} required />
+              </div>
+              <div className="form-group">
+                <label>Thời gian (phút)</label>
+                <input type="number" value={editingExam.duration} onChange={e => setEditingExam({...editingExam, duration: Number(e.target.value)})} required />
+              </div>
+              <div className="modal-actions">
+                <button type="button" className="btn-cancel" onClick={() => setEditingExam(null)}>Hủy bỏ</button>
+                <button type="submit" className="btn-save" style={{backgroundColor: '#5b51d8'}}>Lưu Thay Đổi</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

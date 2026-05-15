@@ -1,83 +1,55 @@
-.taking-exam {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 24px;
-  display: grid;
-  grid-template-columns: 1fr 320px;
-  gap: 24px;
-  align-items: start;
-}
-
-/* Phần nội dung bài thi bên trái */
-.exam-content {
-  background: #fff;
-  border: 1px solid rgba(15, 75, 207, 0.12);
-  border-radius: 16px;
-  padding: 32px;
-  box-shadow: 0 8px 30px rgba(15, 75, 207, 0.08);
-}
-
-.audio-player-mock {
-  background: #f0f7ff;
-  border: 1px solid #dce8ff;
-  padding: 16px 24px;
-  border-radius: 12px;
+/* Bố cục tổng thể: Flexbox chia 2 cột */
+.taking-exam-container {
   display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 32px;
+  align-items: flex-start;
+  gap: 24px;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 20px;
+  background-color: #f4f7f6;
+  min-height: 100vh;
 }
 
-.audio-btn {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: #0f4bcf;
-  color: white;
-  border: none;
-  font-size: 18px;
-  cursor: pointer;
-  display: grid;
-  place-items: center;
+/* CỘT TRÁI: Nội dung câu hỏi (Chiếm phần lớn diện tích) */
+.exam-content-col {
+  flex: 1; /* Tự động phình to chiếm hết không gian còn lại */
+  background-color: #ffffff;
+  padding: 30px;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
-.audio-progress {
-  flex: 1;
-  height: 6px;
-  background: #dce8ff;
-  border-radius: 3px;
-  position: relative;
-}
-
-.audio-progress-bar {
-  position: absolute;
-  left: 0;
+.audio-player-sticky {
+  position: sticky;
   top: 0;
-  height: 100%;
-  width: 30%;
-  background: #0f4bcf;
-  border-radius: 3px;
+  z-index: 10;
+  background: white;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #eee;
+  margin-bottom: 20px;
 }
 
-.question-block {
-  margin-bottom: 32px;
-  padding-bottom: 24px;
-  border-bottom: 1px dashed #e5e7eb;
+.question-item {
+  margin-bottom: 35px;
+  padding-bottom: 25px;
+  border-bottom: 1px dashed #e0e0e0;
 }
 
-.question-block:last-child {
+.question-item:last-child {
   border-bottom: none;
 }
 
 .question-text {
-  font-weight: 600;
   font-size: 16px;
-  margin-bottom: 16px;
-  color: #0f2f6d;
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 15px;
 }
 
-.options-grid {
-  display: grid;
+/* Các đáp án A, B, C, D xếp dọc */
+.options-group {
+  display: flex;
+  flex-direction: column;
   gap: 12px;
 }
 
@@ -85,178 +57,258 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 16px;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  padding: 8px 12px;
+  border-radius: 6px;
+  transition: background-color 0.2s;
 }
 
 .option-label:hover {
-  background: #f8fbff;
-  border-color: #0f4bcf;
+  background-color: #f8f9fa;
 }
 
-/* Sidebar bên phải */
-.exam-sidebar {
+.option-label.selected .option-circle {
+  background-color: #0f2f6d;
+  color: white;
+  border-color: #0f2f6d;
+}
+
+.option-circle {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid #ccc;
+  border-radius: 50%;
+  font-weight: bold;
+  font-size: 14px;
+  color: #555;
+  transition: all 0.2s;
+}
+
+.option-text {
+  font-size: 15px;
+  color: #444;
+}
+
+/* CỘT PHẢI: Thanh điều hướng cố định (Sticky Sidebar) */
+.exam-sidebar-col {
+  width: 320px; /* Chiều rộng cố định của thanh bên phải */
+  flex-shrink: 0;
+  /* Phép thuật Sticky: Gắn chặt thanh này trên màn hình khi cuộn */
   position: sticky;
-  top: 24px;
+  top: 20px; 
+  height: calc(100vh - 40px); /* Kéo dài bằng chiều cao màn hình trừ viền */
+  overflow-y: auto; /* Nếu nhiều Part quá thì thanh này tự có thanh cuộn riêng */
+  
+  background-color: #ffffff;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 20px;
 }
 
-.timer-card {
-  background: #0f4bcf;
-  color: white;
-  padding: 20px;
-  border-radius: 16px;
+/* Ẩn thanh cuộn tàng hình cho đẹp (Tùy chọn) */
+.exam-sidebar-col::-webkit-scrollbar {
+  width: 6px;
+}
+.exam-sidebar-col::-webkit-scrollbar-thumb {
+  background-color: #ccc;
+  border-radius: 10px;
+}
+
+.timer-box {
   text-align: center;
-  box-shadow: 0 8px 20px rgba(15, 75, 207, 0.2);
+  padding: 15px;
+  background-color: #f8faff;
+  border: 2px solid #e1e8f5;
+  border-radius: 8px;
 }
 
-.timer-card h3 {
-  margin: 0 0 8px 0;
-  font-size: 14px;
-  opacity: 0.9;
-}
-
-.time-display {
-  font-size: 32px;
-  font-weight: 700;
-  letter-spacing: 2px;
-}
-
-.answer-sheet {
-  background: #fff;
-  border: 1px solid rgba(15, 75, 207, 0.12);
-  border-radius: 16px;
-  padding: 20px;
-  box-shadow: 0 8px 30px rgba(15, 75, 207, 0.08);
-  max-height: 60vh;
-  overflow-y: auto;
-}
-
-.answer-sheet h3 {
-  margin: 0 0 16px 0;
-  color: #0f2f6d;
-  font-size: 16px;
-  text-align: center;
-}
-
-.sheet-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
-}
-
-.sheet-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-}
-
-.sheet-number {
-  font-weight: 600;
-  color: #5c7aa3;
-  width: 24px;
-}
-
-.sheet-bubble {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  border: 1px solid #ccc;
-  display: grid;
-  place-items: center;
+.timer-label {
   font-size: 12px;
-  cursor: pointer;
-  transition: all 0.2s ease;
   color: #666;
+  font-weight: bold;
+  margin-bottom: 5px;
 }
 
-.sheet-bubble.selected {
-  background: #0f4bcf;
-  color: white;
-  border-color: #0f4bcf;
+.timer-value {
+  font-size: 28px;
+  font-weight: 800;
+  color: #d93025;
 }
 
-.submit-exam-btn {
+.submit-btn {
   width: 100%;
-  padding: 16px;
-  background: #dc3545;
+  padding: 14px;
+  background-color: #0f2f6d;
   color: white;
   border: none;
-  border-radius: 12px;
-  font-size: 16px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: background 0.2s ease;
-}
-
-.submit-exam-btn:hover {
-  background: #c82333;
-}
-
-@media (max-width: 960px) {
-  .taking-exam {
-    grid-template-columns: 1fr;
-  }
-  .exam-sidebar {
-    position: static;
-  }
-}
-/* --- GIAO DIỆN BẢNG ĐIỀU HƯỚNG CÂU HỎI THEO PART --- */
-.answer-sheet {
-  background-color: #fff;
-  padding: 20px;
   border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-  max-height: calc(100vh - 250px); /* Thanh cuộn nếu quá dài */
-  overflow-y: auto;
-}
-
-.part-section {
-  margin-bottom: 25px;
-}
-
-.part-heading {
-  font-size: 18px;
-  color: #333;
+  font-size: 16px;
   font-weight: bold;
-  margin-bottom: 12px;
-  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.submit-btn:hover {
+  background-color: #0c2454;
+}
+
+/* Khu vực lưới số thứ tự câu hỏi */
+.nav-part-section {
+  margin-bottom: 15px;
+}
+
+.nav-part-title {
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 10px;
+  font-size: 14px;
   border-bottom: 1px solid #eee;
   padding-bottom: 5px;
 }
 
 .question-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr); /* Chia 5 cột y hệt ảnh */
-  gap: 8px;
+  grid-template-columns: repeat(5, 1fr); /* Đẹp nhất là chia 5 cột như mẫu */
+  gap: 6px;
 }
 
 .q-box {
-  border: 1px solid #333;
-  border-radius: 2px;
-  padding: 6px 0;
-  text-align: center;
-  font-size: 14px;
+  aspect-ratio: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 13px;
   font-weight: 500;
+  color: #555;
   cursor: pointer;
-  background-color: #fff;
-  color: #333;
+  background-color: white;
   transition: all 0.2s ease;
 }
 
 .q-box:hover {
-  background-color: #e2e8f0;
+  border-color: #0f2f6d;
+  background-color: #f0f4f8;
 }
 
-/* Hiệu ứng khi câu hỏi ĐÃ ĐƯỢC CHỌN đáp án */
+/* Ô đã làm bài đổi màu xanh */
 .q-box.answered {
-  background-color: #0f4bcf; 
-  color: #fff;
-  border-color: #0f4bcf;
+  background-color: #e3f2fd;
+  color: #0f2f6d;
+  border-color: #90caf9;
+  font-weight: bold;
+}
+/* --- GIAO DIỆN TABS CHUYỂN PART --- */
+.part-tabs-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 25px;
+  border-bottom: 2px solid #e1e8f5;
+  padding-bottom: 15px;
+}
+
+.part-tab-btn {
+  padding: 10px 20px;
+  background-color: transparent;
+  border: 1px solid #d0d7e5;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #555;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.part-tab-btn:hover {
+  background-color: #f0f4f8;
+  color: #0f2f6d;
+}
+
+.part-tab-btn.active {
+  background-color: #0f2f6d;
+  color: white;
+  border-color: #0f2f6d;
+  box-shadow: 0 4px 6px rgba(15, 47, 109, 0.2);
+}
+
+/* --- NÚT ĐIỀU HƯỚNG PART TIẾP THEO (DƯỚI CÙNG) --- */
+.part-navigation-buttons {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 30px;
+  padding-top: 20px;
+  border-top: 1px dashed #ccc;
+}
+
+.nav-part-btn {
+  padding: 10px 24px;
+  background-color: #e1e8f5;
+  color: #0f2f6d;
+  border: none;
+  border-radius: 6px;
+  font-weight: bold;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.nav-part-btn:hover {
+  background-color: #cdd8ef;
+}
+/* --- LAYOUT CHIA ĐÔI CHO PART 6 & 7 (GIỐNG STUDY4) --- */
+.reading-split-container {
+  display: flex;
+  gap: 25px;
+  align-items: flex-start;
+}
+
+/* Cột bên trái: Hiển thị bài đọc/Hình ảnh (Đứng im khi cuộn) */
+.passage-left-col {
+  flex: 1;
+  position: sticky;
+  top: 20px;
+  background-color: #f8faff;
+  border: 1px solid #d0d7e5;
+  border-radius: 8px;
+  padding: 20px;
+  max-height: calc(100vh - 100px);
+  overflow-y: auto;
+}
+
+.passage-image {
+  width: 100%;
+  border-radius: 4px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.passage-text {
+  font-size: 15px;
+  line-height: 1.6;
+  color: #333;
+  white-space: pre-wrap;
+}
+
+.passage-title {
+  font-weight: bold;
+  color: #0f2f6d;
+  margin-bottom: 15px;
+  font-size: 16px;
+  border-bottom: 1px dashed #ccc;
+  padding-bottom: 10px;
+}
+
+/* Cột bên phải: Hiển thị các câu hỏi */
+.questions-right-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
