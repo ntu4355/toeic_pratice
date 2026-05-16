@@ -52,7 +52,6 @@ const userSchema = new mongoose.Schema({
 
 const User = mongoose.model('User', userSchema);
 
-
 // --- CLOUDINARY ---
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -191,7 +190,7 @@ async function processExamInBackground(pdfFiles, examName, duration, partsArray,
 
                 for (let j = 0; j < totalPages; j += pagesPerChunk) {
                     const endIndex = Math.min(j + pagesPerChunk, totalPages);
-                    console.log(`[Worker] Đang xử lý mảnh từ trang ${j + 1} đến ${endIndex}...`);
+                    console.log(`\n[Worker] Đang xử lý mảnh từ trang ${j + 1} đến ${endIndex}...`);
 
                     // 3.1. Tạo mảnh PDF nhỏ
                     const subDocument = await PDFDocument.create();
@@ -203,56 +202,95 @@ async function processExamInBackground(pdfFiles, examName, duration, partsArray,
                     const tempPdfPath = path.join(process.cwd(), `uploads/temp_${Date.now()}_${j}.pdf`);
                     fs.writeFileSync(tempPdfPath, subPdfBytes);
 
-                    // 3.2. Gửi mảnh nhỏ cho Gemini
-                    let uploadResponse;
-                    try {
-                        uploadResponse = await fileManager.uploadFile(tempPdfPath, {
-                            mimeType: "application/pdf",
-                            displayName: `Mảnh trang ${j + 1} đến ${endIndex}`,
-                        });
-                        
-                        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-                        const PROMPT_TOEIC = `Bạn là chuyên gia TOEIC. Hãy bóc tách các câu hỏi trắc nghiệm từ đoạn văn bản sau.
-                        LƯU Ý QUAN TRỌNG:
-                        - Bỏ qua Part 1 và Part 2. Chỉ tập trung Part 3, 4, 5, 6, 7.
-                        - Lấy CHUẨN XÁC số thứ tự câu hỏi (QuestionNo).
-                        - ĐỐI VỚI PART 6 VÀ PART 7: BẮT BUỘC phải đọc và trích xuất TOÀN BỘ nội dung của đoạn văn/bài đọc (tờ rơi, email, bài báo...) và đưa vào trường "PassageText" cho TẤT CẢ các câu hỏi thuộc đoạn văn đó.
-                        - Đối với các câu không có đoạn văn chung (như Part 5), để "PassageText": "".
-                        - Bắt buộc trả về đúng định dạng JSON object duy nhất có key 'questions':
-                        { "questions": [ { "Part": int, "QuestionNo": int, "QuestionText": string, "OptionA": string, "OptionB": string, "OptionC": string, "OptionD": string, "CorrectAnswer": "", "PassageText": string } ] }`;
+                    // ========================================================
+                    // BỘ ĐẾM RETRY: TỰ ĐỘNG THỬ LẠI TỐI ĐA 3 LẦN NẾU LỖI
+                    // ========================================================
+                    const MAX_RETRIES = 3;
+                    let attempt = 0;
+                    let chunkSuccess = false;
 
-                        const result = await model.generateContent([
-                            { fileData: { mimeType: uploadResponse.file.mimeType, fileUri: uploadResponse.file.uri } },
-                            { text: PROMPT_TOEIC },
-                        ]);
+                    while (attempt < MAX_RETRIES && !chunkSuccess) {
+                        attempt++;
+                        let uploadResponse;
+                        try {
+                            if (attempt > 1) {
+                                console.log(`[Worker] 🔄 Đang xử lý LẠI mảnh trang ${j + 1}-${endIndex} (Lần thử ${attempt}/${MAX_RETRIES})...`);
+                            }
 
-                        let rawText = result.response.text();
-                        rawText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
-                        const parsedData = JSON.parse(rawText);
+                            // 3.2. Gửi mảnh nhỏ cho Gemini
+                            uploadResponse = await fileManager.uploadFile(tempPdfPath, {
+                                mimeType: "application/pdf",
+                                displayName: `Mảnh trang ${j + 1} đến ${endIndex}`,
+                            });
+                            
+                            // Sử dụng Gemini 2.5 và ép kiểu JSON
+                            const model = genAI.getGenerativeModel({ 
+                                model: "gemini-2.5-flash",
+                                generationConfig: { responseMimeType: "application/json" }
+                            });
 
-                        if (parsedData.questions && parsedData.questions.length > 0) {
-                            const processedQuestions = parsedData.questions.map(q => ({
-                                ...q,
-                                AudioUrl: audioUrlMap[q.QuestionNo] || ""
-                            }));
-                            finalQuestionsArray = [...finalQuestionsArray, ...processedQuestions];
-                            console.log(`[Worker] [V] Quét xong mảnh này. Lấy được ${processedQuestions.length} câu hỏi.`);
-                        } else {
-                            console.log(`[Worker] [!] Mảnh này không có câu hỏi nào.`);
+                            const PROMPT_TOEIC = `Bạn là chuyên gia TOEIC. Hãy bóc tách các câu hỏi trắc nghiệm từ đoạn văn bản sau.
+                            LƯU Ý QUAN TRỌNG:
+                            - Bỏ qua Part 1 và Part 2. Chỉ tập trung Part 3, 4, 5, 6, 7.
+                            - Lấy CHUẨN XÁC số thứ tự câu hỏi (QuestionNo).
+                            - ĐỐI VỚI PART 6 VÀ PART 7: BẮT BUỘC phải đọc và trích xuất TOÀN BỘ nội dung của đoạn văn/bài đọc (tờ rơi, email, bài báo...) và đưa vào trường "PassageText" cho TẤT CẢ các câu hỏi thuộc đoạn văn đó.
+                            - Đối với các câu không có đoạn văn chung (như Part 5), để "PassageText": "".
+                            - Bắt buộc trả về đúng định dạng JSON object duy nhất có key 'questions':
+                            { "questions": [ { "Part": int, "QuestionNo": int, "QuestionText": string, "OptionA": string, "OptionB": string, "OptionC": string, "OptionD": string, "CorrectAnswer": "", "PassageText": string } ] }`;
+
+                            const result = await model.generateContent([
+                                { fileData: { mimeType: uploadResponse.file.mimeType, fileUri: uploadResponse.file.uri } },
+                                { text: PROMPT_TOEIC },
+                            ]);
+
+                            let rawText = result.response.text();
+                            
+                            const firstBrace = rawText.indexOf('{');
+                            const lastBrace = rawText.lastIndexOf('}');
+
+                            if (firstBrace !== -1 && lastBrace !== -1) {
+                                const cleanJson = rawText.substring(firstBrace, lastBrace + 1);
+                                const parsedData = JSON.parse(cleanJson);
+
+                                if (parsedData.questions && parsedData.questions.length > 0) {
+                                    const processedQuestions = parsedData.questions.map(q => ({
+                                        ...q,
+                                        AudioUrl: audioUrlMap[q.QuestionNo] || ""
+                                    }));
+                                    finalQuestionsArray = [...finalQuestionsArray, ...processedQuestions];
+                                    console.log(`[Worker] [V] Quét xong mảnh này. Lấy được ${processedQuestions.length} câu hỏi.`);
+                                    chunkSuccess = true; // Thành công => Thoát vòng lặp while
+                                } else {
+                                    throw new Error("AI không tìm thấy câu hỏi nào trong mảnh này.");
+                                }
+                            } else {
+                                throw new Error("AI không trả về chuẩn cấu trúc JSON.");
+                            }
+
+                        } catch (error) {
+                            console.error(`[Worker] [!] Lỗi ở mảnh từ trang ${j + 1} (Thử lần ${attempt}):`, error.message);
+                            if (attempt < MAX_RETRIES) {
+                                console.log(`[Worker] ⏳ Đang ngủ 60 giây để hồi phục trước khi làm lại...`);
+                                await sleep(60000);
+                            } else {
+                                console.error(`[Worker] ❌ BỎ QUA mảnh trang ${j + 1}-${endIndex} sau ${MAX_RETRIES} lần thất bại liên tiếp.`);
+                            }
+                        } finally {
+                            // Dọn dẹp file trên Google File Manager sau mỗi lần thử
+                            if (uploadResponse) {
+                                try { await fileManager.deleteFile(uploadResponse.file.name); } catch(e){}
+                            }
                         }
+                    } 
+                    // ========================================================
+                    // KẾT THÚC VÒNG LẶP RETRY
+                    // ========================================================
 
-                    } catch (error) {
-                        console.error(`[Worker] [!] Lỗi ở mảnh từ trang ${j + 1}:`, error.message);
-                    } finally {
-                        if (uploadResponse) {
-                            try { await fileManager.deleteFile(uploadResponse.file.name); } catch(e){}
-                        }
-                        try { fs.unlinkSync(tempPdfPath); } catch(e){}
-                    }
+                    try { fs.unlinkSync(tempPdfPath); } catch(e){}
 
-                    // 3.3 NGỦ ĐÔNG 60 GIÂY ĐỂ TRÁNH LỖI QUÁ TẢI (TRỪ MẢNH CUỐI CÙNG)
+                    // 3.3. Nếu chưa phải mảnh cuối cùng, ngủ 60s chờ hồi token cho MẢNH TIẾP THEO
                     if (j + pagesPerChunk < totalPages || i < pdfFiles.length - 1) {
-                         console.log(`[Worker] ⏳ Đang ngủ 60 giây để chờ Google hồi phục Token...`);
+                         console.log(`[Worker] ⏳ Đang ngủ 60 giây để chờ Google hồi phục Token cho mảnh TIẾP THEO...`);
                          await sleep(60000);
                     }
                 }
