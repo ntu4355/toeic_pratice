@@ -130,25 +130,38 @@ const TakingExam = () => {
   const prevPart = currentPartIndex > 0 ? availableParts[currentPartIndex - 1] : null;
   const nextPart = currentPartIndex < availableParts.length - 1 ? availableParts[currentPartIndex + 1] : null;
 
-  // THUẬT TOÁN GỘP NHÓM CÂU HỎI THEO BÀI ĐỌC (PASSAGE)
+  // =======================================================================
+  // THUẬT TOÁN MỚI: GỘP NHÓM CÂU HỎI THEO MẢNG HÌNH ẢNH (PASSAGE IMAGES)
+  // =======================================================================
   const passageGroups = [];
-  let currentPassage = null;
+  let currentImageKey = null;
   let currentGroup = [];
 
   displayedQuestions.forEach(q => {
-    const qPassage = q.PassageText || "";
-    if (qPassage !== currentPassage) {
+    // Nối các link ảnh lại thành một chuỗi duy nhất để làm chìa khóa so sánh
+    const qImageKey = (q.PassageImages && q.PassageImages.length > 0) 
+      ? q.PassageImages.join("||") 
+      : `no_img_${q.QuestionNo}`; // Nếu câu nào không có ảnh thì ép nó đứng riêng 1 mình
+
+    if (qImageKey !== currentImageKey) {
       if (currentGroup.length > 0) {
-        passageGroups.push({ passage: currentPassage, questions: currentGroup });
+        passageGroups.push({ 
+          images: currentGroup[0].PassageImages || [], 
+          questions: currentGroup 
+        });
       }
-      currentPassage = qPassage;
+      currentImageKey = qImageKey;
       currentGroup = [q];
     } else {
       currentGroup.push(q);
     }
   });
+
   if (currentGroup.length > 0) {
-    passageGroups.push({ passage: currentPassage, questions: currentGroup });
+    passageGroups.push({ 
+      images: currentGroup[0].PassageImages || [], 
+      questions: currentGroup 
+    });
   }
 
   return (
@@ -171,37 +184,57 @@ const TakingExam = () => {
           ))}
         </div>
 
-        {/* GIAO DIỆN CHIA ĐÔI MÀN HÌNH (PART 6 & 7) */}
+        {/* GIAO DIỆN CHIA ĐÔI MÀN HÌNH (PART 6 & 7) - BÂY GIỜ HIỂN THỊ DẢI ẢNH */}
         {(activePartId === 6 || activePartId === 7) ? (
           <div className="part-67-wrapper">
             {passageGroups.map((group, idx) => (
-              <div key={idx} className="reading-split-container" style={{ marginBottom: '50px', borderBottom: '2px dashed #ccc', paddingBottom: '30px' }}>
+              <div key={idx} className="reading-split-container" style={{ marginBottom: '50px', borderBottom: '2px dashed #ccc', paddingBottom: '30px', display: 'flex', gap: '20px' }}>
                 
-                {/* CỘT TRÁI: ĐOẠN VĂN BẢN (Do AI tự trích xuất) */}
-                <div className="passage-left-col">
-                   <div className="passage-title">
-                     Câu hỏi {group.questions[0]?.QuestionNo} - {group.questions[group.questions.length - 1]?.QuestionNo} tham khảo đoạn văn sau:
+                {/* CỘT TRÁI: DẢI ẢNH ĐOẠN VĂN (MỚI) */}
+                <div className="passage-left-col" style={{ flex: '2', minWidth: '0' }}>
+                   <div className="passage-title" style={{ fontWeight: 'bold', marginBottom: '15px', color: '#1e293b' }}>
+                     Câu hỏi {group.questions[0]?.QuestionNo} - {group.questions[group.questions.length - 1]?.QuestionNo} tham khảo thông tin sau:
                    </div>
-                   <div className="passage-text" style={{ whiteSpace: "pre-wrap", fontSize: "15px", color: "#333", lineHeight: "1.6" }}>
-                     {group.passage ? group.passage : "(Không có dữ liệu bài đọc)"}
+                   
+                   <div className="passage-images-gallery" style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                     {group.images && group.images.length > 0 ? (
+                       group.images.map((imgUrl, imgIdx) => (
+                         <img 
+                           key={imgIdx} 
+                           src={imgUrl} 
+                           alt={`Đoạn văn ${imgIdx + 1} cho câu ${group.questions[0]?.QuestionNo}`} 
+                           style={{ 
+                             width: '100%', 
+                             height: 'auto', 
+                             borderRadius: '8px', 
+                             border: '1px solid #cbd5e1', 
+                             boxShadow: '0 2px 4px rgba(0,0,0,0.05)' 
+                           }} 
+                         />
+                       ))
+                     ) : (
+                       <div style={{ padding: '20px', background: '#fef2f2', color: '#991b1b', borderRadius: '8px', border: '1px dashed #fca5a5' }}>
+                         (Không tìm thấy dữ liệu ảnh bài đọc cho nhóm câu hỏi này)
+                       </div>
+                     )}
                    </div>
                 </div>
 
                 {/* CỘT PHẢI: CÁC CÂU HỎI TRẮC NGHIỆM */}
-                <div className="questions-right-col">
+                <div className="questions-right-col" style={{ flex: '1', minWidth: '0' }}>
                   {group.questions.map((q) => (
-                    <div key={q.QuestionNo} id={`question-${q.QuestionNo}`} className="question-item" style={{backgroundColor: '#fff', padding: '15px', borderRadius: '8px', border: '1px solid #eee'}}>
-                      <p className="question-text" style={{fontSize: '14px', marginBottom: '10px'}}>
+                    <div key={q.QuestionNo} id={`question-${q.QuestionNo}`} className="question-item" style={{backgroundColor: '#fff', padding: '15px', borderRadius: '8px', border: '1px solid #eee', marginBottom: '15px'}}>
+                      <p className="question-text" style={{fontSize: '15px', marginBottom: '12px', fontWeight: '500', color: '#0f172a'}}>
                         <strong>{q.QuestionNo}</strong>. {q.QuestionText}
                       </p>
-                      <div className="options-group">
+                      <div className="options-group" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                         {["A", "B", "C", "D"].map((opt) => {
                           if (!q[`Option${opt}`]) return null; 
                           return (
-                            <label key={opt} className={`option-label ${answers[q.QuestionNo] === opt ? 'selected' : ''}`} style={{padding: '5px'}}>
-                              <input type="radio" name={`question-${q.QuestionNo}`} value={opt} checked={answers[q.QuestionNo] === opt} onChange={() => handleSelectAnswer(q.QuestionNo, opt)} />
-                              <span className="option-circle" style={{width: '22px', height: '22px', fontSize: '12px'}}>{opt}</span>
-                              <span className="option-text" style={{fontSize: '14px'}}>{q[`Option${opt}`]}</span>
+                            <label key={opt} className={`option-label ${answers[q.QuestionNo] === opt ? 'selected' : ''}`} style={{padding: '8px 12px', cursor: 'pointer', borderRadius: '6px', border: '1px solid transparent'}}>
+                              <input type="radio" name={`question-${q.QuestionNo}`} value={opt} checked={answers[q.QuestionNo] === opt} onChange={() => handleSelectAnswer(q.QuestionNo, opt)} style={{ display: 'none' }} />
+                              <span className="option-circle" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '24px', height: '24px', borderRadius: '50%', border: '1px solid #94a3b8', marginRight: '10px', fontSize: '13px', fontWeight: 'bold' }}>{opt}</span>
+                              <span className="option-text" style={{fontSize: '14px', color: '#334155'}}>{q[`Option${opt}`]}</span>
                             </label>
                           );
                         })}
@@ -236,7 +269,7 @@ const TakingExam = () => {
                   </p>
                   
                   {q.ImageUrl && (
-                    <img src={q.ImageUrl} alt={`Question ${q.QuestionNo}`} style={{maxWidth: "100%", maxHeight: "300px", marginBottom: "15px"}} />
+                    <img src={q.ImageUrl} alt={`Question ${q.QuestionNo}`} style={{maxWidth: "100%", maxHeight: "400px", marginBottom: "15px", borderRadius: "8px"}} />
                   )}
                   
                   <div className="options-group">

@@ -1,7 +1,8 @@
 .app {
-  width: min(1150px, 92%);
+  width: min(1150px, 92%); 
   margin: 0 auto;
   padding: 24px 0 48px;
+  max-width: 100%;
 }
 
 section,

@@ -20,13 +20,13 @@ const TASKS = [
   { id: 'part7_147_148', label: 'Part 7 - Đoạn đơn (147-148)' },
   { id: 'part7_149_150', label: 'Part 7 - Đoạn đơn (149-150)' },
   { id: 'part7_151_152', label: 'Part 7 - Đoạn đơn (151-152)' },
-  { id: 'part7_153_154', label: 'Part 7 - Đoạn đơn (153-154)' },
-  { id: 'part7_155_156', label: 'Part 7 - Đoạn đơn (155-156)' },
-  { id: 'part7_157_158', label: 'Part 7 - Đoạn đơn (157-158)' },
-  { id: 'part7_159_160', label: 'Part 7 - Đoạn đơn (159-160)' },
-  { id: 'part7_161_165', label: 'Part 7 - Đoạn kép (161-165)' },
-  { id: 'part7_166_170', label: 'Part 7 - Đoạn kép (166-170)' },
-  { id: 'part7_171_175', label: 'Part 7 - Đoạn kép (171-175)' },
+  { id: 'part7_153_155', label: 'Part 7 - Đoạn đơn (153-155)' },
+  { id: 'part7_156_157', label: 'Part 7 - Đoạn đơn (156-157)' },
+  { id: 'part7_158_160', label: 'Part 7 - Đoạn đơn (158-160)' },
+  { id: 'part7_161_163', label: 'Part 7 - Đoạn kép (161-163)' },
+  { id: 'part7_164_167', label: 'Part 7 - Đoạn kép (164-167)' },
+  { id: 'part7_168_171', label: 'Part 7 - Đoạn kép (168-171)' },
+  { id: 'part7_172_175', label: 'Part 7 - Đoạn Kép (172-175)' },
   { id: 'part7_176_180', label: 'Part 7 - Đoạn Kép (176-180)' },
   { id: 'part7_181_185', label: 'Part 7 - Đoạn Kép (181-185)' },
   { id: 'part7_186_190', label: 'Part 7 - Đoạn Ba (186-190)' },
@@ -131,7 +131,7 @@ const CreateExam = () => {
       crop.height * scaleY
     );
 
-    const base64Image = cropCanvas.toDataURL('image/jpeg');
+    const base64Image = cropCanvas.toDataURL('image/jpeg', 1.0);
 
     setCompletedCrops(prev => ({
       ...prev,
@@ -273,7 +273,7 @@ const CreateExam = () => {
               <div className="pdf-canvas-wrapper">
                 <Document file={pdfFiles[currentPdfIndex]?.url} onLoadSuccess={onDocumentLoadSuccess} loading={<div className="loading-txt">Đang tải PDF...</div>}>
                   <ReactCrop crop={crop} onChange={c => setCrop(c)}>
-                    <Page pageNumber={pageNumber} renderTextLayer={false} renderAnnotationLayer={false} width={700} />
+                    <Page pageNumber={pageNumber} renderTextLayer={false} renderAnnotationLayer={false} width={700} devicePixelRatio={3} /* Phép thuật ở đây: Bắt PDF vẽ chi tiết gấp 3 lần bình thường */ />
                   </ReactCrop>
                 </Document>
               </div>

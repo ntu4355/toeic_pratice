@@ -1,314 +1,335 @@
-/* Bố cục tổng thể: Flexbox chia 2 cột */
+/* =========================================================
+   GIAO DIỆN PHÒNG THI TOEIC - TRÀN VIỀN & CHUYÊN NGHIỆP
+========================================================= */
+
+/* CONTAINER CHÍNH - Tràn viền màn hình */
 .taking-exam-container {
   display: flex;
+  gap: 25px;
+  width: 100%;
+  max-width: 100%; /* Ép tràn viền, phá bỏ giới hạn của thẻ bọc ngoài (nếu có) */
+  padding: 20px 30px;
+  box-sizing: border-box;
   align-items: flex-start;
-  gap: 24px;
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 20px;
-  background-color: #f4f7f6;
+  background-color: #f1f5f9; /* Nền xám xanh cực nhạt giúp đỡ mỏi mắt */
   min-height: 100vh;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
-/* CỘT TRÁI: Nội dung câu hỏi (Chiếm phần lớn diện tích) */
+/* =========================================================
+   CỘT TRÁI: NỘI DUNG BÀI THI (GIÃN NỞ TỐI ĐA)
+========================================================= */
 .exam-content-col {
-  flex: 1; /* Tự động phình to chiếm hết không gian còn lại */
-  background-color: #ffffff;
+  flex: 1; /* Tự động phình to ra chiếm hết không gian trống */
+  min-width: 0; /* Ngăn chặn nội dung bị tràn ngang */
+  background: #ffffff;
+  border-radius: 12px;
   padding: 30px;
-  border-radius: 10px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 4px 6px rgba(0,0,0,0.05);
 }
 
-.audio-player-sticky {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  background: white;
+/* THANH CHUYỂN PART */
+.part-tabs-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 25px;
+  border-bottom: 2px solid #e2e8f0;
   padding-bottom: 15px;
-  border-bottom: 1px solid #eee;
-  margin-bottom: 20px;
 }
 
-.question-item {
-  margin-bottom: 35px;
-  padding-bottom: 25px;
-  border-bottom: 1px dashed #e0e0e0;
-}
-
-.question-item:last-child {
-  border-bottom: none;
-}
-
-.question-text {
-  font-size: 16px;
-  font-weight: 500;
-  color: #333;
-  margin-bottom: 15px;
-}
-
-/* Các đáp án A, B, C, D xếp dọc */
-.options-group {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.option-label {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  cursor: pointer;
-  padding: 8px 12px;
-  border-radius: 6px;
-  transition: background-color 0.2s;
-}
-
-.option-label:hover {
-  background-color: #f8f9fa;
-}
-
-.option-label.selected .option-circle {
-  background-color: #0f2f6d;
-  color: white;
-  border-color: #0f2f6d;
-}
-
-.option-circle {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  width: 28px;
-  height: 28px;
-  border: 1px solid #ccc;
-  border-radius: 50%;
+.part-tab-btn {
+  padding: 10px 20px;
+  border: none;
+  background: #f8fafc;
+  color: #64748b;
+  border-radius: 8px;
   font-weight: bold;
-  font-size: 14px;
-  color: #555;
-  transition: all 0.2s;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
 }
 
-.option-text {
-  font-size: 15px;
-  color: #444;
+.part-tab-btn:hover:not(.active) {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
 }
 
-/* CỘT PHẢI: Thanh điều hướng cố định (Sticky Sidebar) */
-.exam-sidebar-col {
-  width: 320px; /* Chiều rộng cố định của thanh bên phải */
-  flex-shrink: 0;
-  /* Phép thuật Sticky: Gắn chặt thanh này trên màn hình khi cuộn */
-  position: sticky;
-  top: 20px; 
-  height: calc(100vh - 40px); /* Kéo dài bằng chiều cao màn hình trừ viền */
-  overflow-y: auto; /* Nếu nhiều Part quá thì thanh này tự có thanh cuộn riêng */
+.part-tab-btn.active {
+  background: #3b82f6; /* Màu xanh dương chủ đạo */
+  color: white;
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+}
+
+/* GIAO DIỆN CHIA ĐÔI MÀN HÌNH (PART 6 & 7) */
+.reading-split-container {
+  display: flex;
+  gap: 30px;
+  margin-bottom: 50px;
+  border-bottom: 2px dashed #cbd5e1;
+  padding-bottom: 30px;
+}
+
+/* --- ĐIỀU CHỈNH TỈ LỆ CỘT --- */
+/* --- ĐIỀU CHỈNH TỈ LỆ CỘT VÀ TẠO THANH CUỘN ĐỘC LẬP CHO ẢNH --- */
+.passage-left-col {
+  flex: 5.5; /* Cột chứa ảnh chiếm 55% màn hình */
+  min-width: 0;
   
-  background-color: #ffffff;
-  padding: 20px;
+  /* CÁC DÒNG MỚI THÊM VÀO ĐỂ TẠO CUỘN */
+  position: sticky;
+  top: 20px; /* Ghim cố định cách mép trên màn hình 20px */
+  max-height: calc(100vh - 40px); /* Chiều cao tối đa bằng màn hình để không bị tràn */
+  overflow-y: auto; /* Tự động hiện thanh cuộn dọc nếu ảnh quá dài */
+  padding-right: 15px; /* Đẩy ảnh cách xa thanh cuộn một chút cho thoáng */
+}
+
+/* --- LÀM ĐẸP THANH CUỘN (SCROLLBAR) CHO CỘT ẢNH --- */
+.passage-left-col::-webkit-scrollbar {
+  width: 6px; /* Thanh cuộn mỏng, tinh tế */
+}
+
+.passage-left-col::-webkit-scrollbar-track {
+  background: #f8fafc; /* Màu nền của rãnh cuộn */
   border-radius: 10px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.passage-left-col::-webkit-scrollbar-thumb {
+  background: #cbd5e1; /* Màu của thanh nắm kéo */
+  border-radius: 10px;
+}
+
+.passage-left-col::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8; /* Đậm hơn khi di chuột vào */
+}
+
+.questions-right-col {
+  flex: 4.5; /* Cột chứa câu hỏi chiếm 45% màn hình */
+  min-width: 0;
+}
+
+/* --- GIỚI HẠN ẢNH KHÔNG BỊ PHÓNG TO QUÁ MỨC --- */
+.passage-images-gallery img {
+  max-width: 100%;
+  height: auto;
+  object-fit: contain;
+  border-radius: 4px;
+}
+
+/* DANH SÁCH CÂU HỎI */
+.questions-list {
   display: flex;
   flex-direction: column;
   gap: 20px;
 }
 
-/* Ẩn thanh cuộn tàng hình cho đẹp (Tùy chọn) */
-.exam-sidebar-col::-webkit-scrollbar {
-  width: 6px;
-}
-.exam-sidebar-col::-webkit-scrollbar-thumb {
-  background-color: #ccc;
-  border-radius: 10px;
+/* --- THU GỌN KHỐI CÂU HỎI --- */
+.question-item {
+  background: #ffffff;
+  padding: 12px 15px; /* Giảm padding cho gọn */
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  margin-bottom: 12px; /* Kéo các câu hỏi sát lại nhau */
 }
 
+.question-text {
+  font-size: 14px; /* Giảm cỡ chữ câu hỏi */
+  margin-bottom: 10px;
+  color: #1e293b;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+/* STYLE CHO CÁC ĐÁP ÁN A, B, C, D */
+.options-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px; /* Ép sát các đáp án lại */
+}
+
+.option-label {
+  display: flex;
+  align-items: center;
+  padding: 6px 10px; /* Thu gọn viền của đáp án */
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.option-label:hover {
+  background: #f1f5f9;
+}
+
+.option-label.selected {
+  background: #eff6ff; /* Nền xanh nhạt khi được chọn */
+  border-color: #3b82f6;
+}
+
+.option-label input[type="radio"] {
+  display: none; /* Ẩn nút radio mặc định đi để làm nút tùy chỉnh */
+}
+
+/* --- THU NHỎ NÚT TRÒN A B C D --- */
+.option-circle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px; /* Thu nhỏ từ 26px xuống 20px */
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid #94a3b8;
+  margin-right: 10px;
+  font-weight: bold;
+  font-size: 11px; /* Cỡ chữ nhỏ lại */
+  color: #64748b;
+  background: white;
+  transition: all 0.2s;
+}
+
+.option-label.selected .option-circle {
+  border-color: #3b82f6;
+  background: #3b82f6;
+  color: white;
+}
+
+.option-text {
+  font-size: 13px; /* Cỡ chữ đáp án nhỏ gọn dễ nhìn */
+  color: #334155;
+  line-height: 1.4;
+}
+
+/* NÚT ĐIỀU HƯỚNG CUỐI TRANG */
+.part-navigation-buttons {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 30px;
+  padding-top: 20px;
+  border-top: 2px solid #e2e8f0;
+}
+
+.nav-part-btn {
+  padding: 12px 24px;
+  background: #0f2f6d; /* Màu xanh đen sang trọng */
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+.nav-part-btn:hover {
+  background: #1e3a8a;
+}
+
+/* =========================================================
+   CỘT PHẢI: BẢNG ĐIỀU HƯỚNG CÂU HỎI (THU NHỎ LẠI)
+========================================================= */
+.exam-sidebar-col {
+  width: 260px; /* ÉP NHỎ LẠI CHO VỪA VẶN */
+  flex-shrink: 0;
+  position: sticky;
+  top: 20px; /* Trôi theo khi cuộn chuột */
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  padding: 20px;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+  max-height: calc(100vh - 40px);
+  overflow-y: auto; /* Thêm thanh cuộn nếu đề quá dài */
+}
+
+/* ĐỒNG HỒ ĐẾM NGƯỢC */
 .timer-box {
   text-align: center;
   padding: 15px;
-  background-color: #f8faff;
-  border: 2px solid #e1e8f5;
+  background: #eff6ff;
   border-radius: 8px;
+  border: 1px solid #bfdbfe;
+  margin-bottom: 20px;
 }
 
 .timer-label {
   font-size: 12px;
-  color: #666;
+  color: #1d4ed8;
   font-weight: bold;
   margin-bottom: 5px;
 }
 
 .timer-value {
   font-size: 28px;
-  font-weight: 800;
-  color: #d93025;
+  font-weight: bold;
+  color: #1e3a8a;
+  font-family: 'Courier New', Courier, monospace;
 }
 
+/* NÚT NỘP BÀI */
 .submit-btn {
   width: 100%;
   padding: 14px;
-  background-color: #0f2f6d;
+  background: #ef4444; /* Đỏ rực rỡ để cảnh báo */
   color: white;
   border: none;
   border-radius: 8px;
-  font-size: 16px;
   font-weight: bold;
+  font-size: 16px;
   cursor: pointer;
-  transition: background-color 0.3s;
+  margin-bottom: 25px;
+  transition: background 0.3s;
 }
 
 .submit-btn:hover {
-  background-color: #0c2454;
+  background: #dc2626;
 }
 
-/* Khu vực lưới số thứ tự câu hỏi */
+/* LƯỚI BẢNG CÂU HỎI */
+.question-navigation {
+  margin-top: 10px;
+}
+
 .nav-part-section {
-  margin-bottom: 15px;
+  margin-bottom: 20px;
 }
 
 .nav-part-title {
-  font-weight: bold;
-  color: #333;
-  margin-bottom: 10px;
   font-size: 14px;
-  border-bottom: 1px solid #eee;
+  font-weight: bold;
+  color: #475569;
+  margin-bottom: 10px;
+  border-bottom: 1px solid #e2e8f0;
   padding-bottom: 5px;
 }
 
 .question-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr); /* Đẹp nhất là chia 5 cột như mẫu */
+  grid-template-columns: repeat(5, 1fr); /* CHIA THÀNH 5 CỘT CHO NHỎ GỌN */
   gap: 6px;
 }
 
 .q-box {
-  aspect-ratio: 1 / 1;
+  aspect-ratio: 1; /* Ép thành hình vuông chuẩn */
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid #ccc;
+  border: 1px solid #cbd5e1;
   border-radius: 4px;
-  font-size: 13px;
-  font-weight: 500;
-  color: #555;
+  font-size: 12px;
+  font-weight: bold;
   cursor: pointer;
-  background-color: white;
-  transition: all 0.2s ease;
+  color: #334155;
+  background: #f8fafc;
+  transition: all 0.2s;
 }
 
 .q-box:hover {
-  border-color: #0f2f6d;
-  background-color: #f0f4f8;
+  background: #e2e8f0;
+  border-color: #94a3b8;
 }
 
-/* Ô đã làm bài đổi màu xanh */
+/* Khi đã chọn đáp án thì ô đổi sang màu xanh */
 .q-box.answered {
-  background-color: #e3f2fd;
-  color: #0f2f6d;
-  border-color: #90caf9;
-  font-weight: bold;
-}
-/* --- GIAO DIỆN TABS CHUYỂN PART --- */
-.part-tabs-container {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-bottom: 25px;
-  border-bottom: 2px solid #e1e8f5;
-  padding-bottom: 15px;
-}
-
-.part-tab-btn {
-  padding: 10px 20px;
-  background-color: transparent;
-  border: 1px solid #d0d7e5;
-  border-radius: 8px;
-  font-size: 15px;
-  font-weight: 600;
-  color: #555;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.part-tab-btn:hover {
-  background-color: #f0f4f8;
-  color: #0f2f6d;
-}
-
-.part-tab-btn.active {
-  background-color: #0f2f6d;
+  background-color: #3b82f6;
   color: white;
-  border-color: #0f2f6d;
-  box-shadow: 0 4px 6px rgba(15, 47, 109, 0.2);
-}
-
-/* --- NÚT ĐIỀU HƯỚNG PART TIẾP THEO (DƯỚI CÙNG) --- */
-.part-navigation-buttons {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 30px;
-  padding-top: 20px;
-  border-top: 1px dashed #ccc;
-}
-
-.nav-part-btn {
-  padding: 10px 24px;
-  background-color: #e1e8f5;
-  color: #0f2f6d;
-  border: none;
-  border-radius: 6px;
-  font-weight: bold;
-  font-size: 14px;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.nav-part-btn:hover {
-  background-color: #cdd8ef;
-}
-/* --- LAYOUT CHIA ĐÔI CHO PART 6 & 7 (GIỐNG STUDY4) --- */
-.reading-split-container {
-  display: flex;
-  gap: 25px;
-  align-items: flex-start;
-}
-
-/* Cột bên trái: Hiển thị bài đọc/Hình ảnh (Đứng im khi cuộn) */
-.passage-left-col {
-  flex: 1;
-  position: sticky;
-  top: 20px;
-  background-color: #f8faff;
-  border: 1px solid #d0d7e5;
-  border-radius: 8px;
-  padding: 20px;
-  max-height: calc(100vh - 100px);
-  overflow-y: auto;
-}
-
-.passage-image {
-  width: 100%;
-  border-radius: 4px;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-}
-
-.passage-text {
-  font-size: 15px;
-  line-height: 1.6;
-  color: #333;
-  white-space: pre-wrap;
-}
-
-.passage-title {
-  font-weight: bold;
-  color: #0f2f6d;
-  margin-bottom: 15px;
-  font-size: 16px;
-  border-bottom: 1px dashed #ccc;
-  padding-bottom: 10px;
-}
-
-/* Cột bên phải: Hiển thị các câu hỏi */
-.questions-right-col {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
+  border-color: #2563eb;
 }
