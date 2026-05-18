@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './AdminDashboard.css';
 import CreateExam from '../CreateExam/CreateExam';
+import EditExamModal from "./EditExamModal";
 
 const AdminDashboard = ({ currentUser }) => {
   const [activeTab, setActiveTab] = useState('overview');
@@ -57,27 +58,6 @@ const AdminDashboard = ({ currentUser }) => {
       } catch (error) {
         console.error("Lỗi xóa đề:", error);
       }
-    }
-  };
-
-  const handleSaveEdit = async (e) => {
-    e.preventDefault();
-    try {
-      const response = await fetch(`http://localhost:5000/api/exams/${editingExam._id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: editingExam.name, duration: editingExam.duration }),
-      });
-
-      if (response.ok) {
-        alert("Đã cập nhật thông tin đề thi!");
-        setEditingExam(null); 
-        fetchExams(); 
-      } else {
-        alert("Có lỗi xảy ra khi cập nhật!");
-      }
-    } catch (error) {
-      console.error("Lỗi cập nhật đề:", error);
     }
   };
 
@@ -237,27 +217,13 @@ const AdminDashboard = ({ currentUser }) => {
         )}
       </div>
 
-      {/* LỚP PHỦ MODAL CHỈNH SỬA ĐỀ THI */}
+      {/* LỚP PHỦ MODAL CHỈNH SỬA ĐỀ THI BẰNG COMPONENT MỚI */}
       {editingExam && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <h3 style={{color: '#5b51d8'}}>Chỉnh sửa Đề Thi</h3>
-            <form onSubmit={handleSaveEdit}>
-              <div className="form-group">
-                <label>Tên Đề Thi</label>
-                <input type="text" value={editingExam.name} onChange={e => setEditingExam({...editingExam, name: e.target.value})} required />
-              </div>
-              <div className="form-group">
-                <label>Thời gian (phút)</label>
-                <input type="number" value={editingExam.duration} onChange={e => setEditingExam({...editingExam, duration: Number(e.target.value)})} required />
-              </div>
-              <div className="modal-actions">
-                <button type="button" className="btn-cancel" onClick={() => setEditingExam(null)}>Hủy bỏ</button>
-                <button type="submit" className="btn-save" style={{backgroundColor: '#5b51d8'}}>Lưu Thay Đổi</button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <EditExamModal 
+          exam={editingExam} 
+          onClose={() => setEditingExam(null)} 
+          onRefresh={fetchExams}
+        />
       )}
 
     </div>

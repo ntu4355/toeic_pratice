@@ -26,10 +26,10 @@ const Exam = () => {
         const response = await fetch("http://localhost:5000/api/exams");
         const data = await response.json();
         
-        // Chuyển đổi _id của MongoDB thành id để frontend dễ đọc
+        // SỬA TẠI ĐÂY: Quét cả _id lẫn id để đảm bảo luôn lấy được mã đề thi
         const formattedData = data.map(exam => ({
           ...exam,
-          id: exam._id, 
+          id: exam._id || exam.id, 
           // Mặc định thời gian thi nếu Database chưa có
           duration: exam.duration || 120 
         }));
@@ -63,6 +63,13 @@ const Exam = () => {
       alert("Vui lòng chọn ít nhất 1 part để bắt đầu.");
       return;
     }
+
+    // SỬA TẠI ĐÂY: Thêm chốt chặn kiểm tra lỗi ID trước khi chuyển trang
+    if (!selectedExam) {
+       alert("Lỗi: Không tìm thấy mã Đề thi. Vui lòng F5 tải lại trang!");
+       return;
+    }
+
     // TRUYỀN ID CỦA ĐỀ THI VÀ DANH SÁCH PART SANG TRANG LÀM BÀI
     navigate("/taking-exam", { 
       state: { 

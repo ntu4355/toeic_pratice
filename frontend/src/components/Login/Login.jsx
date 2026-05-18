@@ -53,7 +53,6 @@ const Login = ({ setShowLogin, setCurrentUser }) => {
               role: user.role
             }),
           });
-          // Nếu Backend báo lỗi 400 (Email đã tồn tại) thì cứ bỏ qua ngầm
         } catch (error) {
           console.error("Lỗi khi tạo tài khoản mẫu:", error);
         }
@@ -102,13 +101,21 @@ const Login = ({ setShowLogin, setCurrentUser }) => {
           // Lưu token bảo mật
           localStorage.setItem("token", data.token);
           
-          // Gán State cho App.jsx, giữ nguyên các trường như cũ
-          setCurrentUser({
+          // 💡 SỬA TẠI ĐÂY: Tạo ra cục dữ liệu chứa ĐẦY ĐỦ cả ID
+          const loggedInUser = {
+            id: data.user.id, // <-- CỰC KỲ QUAN TRỌNG ĐỂ XEM LỊCH SỬ
             fullName: data.user.name,
-            username: data.user.name, // Mượn tạm name làm username để không vỡ UI cũ
+            username: data.user.name,
             email: data.user.email,
             role: data.user.role,
-          });
+          };
+
+          // Gán State cho App.jsx để đổi giao diện
+          setCurrentUser(loggedInUser);
+          
+          // 💡 SỬA TẠI ĐÂY: Lưu thẳng vào LocalStorage để các trang khác tự do đọc
+          localStorage.setItem("currentUser", JSON.stringify(loggedInUser));
+
           setShowLogin(false);
           return;
         } else {

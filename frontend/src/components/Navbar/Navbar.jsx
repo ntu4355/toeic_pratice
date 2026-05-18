@@ -1,14 +1,15 @@
 import "./Navbar.css";
 import { assets } from "../../assets/assets";
-import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
+
 const Navbar = ({ setShowLogin, currentUser, setCurrentUser }) => {
   const location = useLocation();
+  
   return (
     <div className="navbar">
       <Link to="/">
         <h2>
-          <a href="" className="logo">
+          <a href="" className="logo" onClick={(e) => e.preventDefault()}>
             TOEIC
           </a>
         </h2>
@@ -48,6 +49,20 @@ const Navbar = ({ setShowLogin, currentUser, setCurrentUser }) => {
             Liên hệ
           </Link>
         </li>
+
+        {/* 💡 THÊM NÚT LỊCH SỬ THI Ở ĐÂY (Chỉ hiện cho User) */}
+        {currentUser && currentUser.role === "user" && (
+          <li>
+            <Link
+              to="/history"
+              className={location.pathname === "/history" ? "active" : ""}
+            >
+              📈 Lịch sử thi
+            </Link>
+          </li>
+        )}
+
+        {/* NÚT ADMIN (Chỉ hiện cho Admin) */}
         {currentUser && currentUser.role === "admin" && (
           <li>
             <Link
@@ -59,14 +74,21 @@ const Navbar = ({ setShowLogin, currentUser, setCurrentUser }) => {
           </li>
         )}
       </ul>
+      
       <div className="navbar-auth">
         {currentUser ? (
           <div className="navbar-user">
-            <span>Xin chào, {currentUser.fullName}</span>
+            {/* Hiển thị tên (Hỗ trợ cả name từ Backend mới hoặc fullName từ bản cũ của bạn) */}
+            <span>Xin chào, {currentUser.fullName || currentUser.name}</span>
             <button
               type="button"
               className="logout-button"
-              onClick={() => setCurrentUser(null)}
+              onClick={() => {
+                setCurrentUser(null);
+                // Dọn dẹp LocalStorage khi đăng xuất để hệ thống an toàn 100%
+                localStorage.removeItem('currentUser');
+                localStorage.removeItem('token');
+              }}
             >
               Đăng xuất
             </button>

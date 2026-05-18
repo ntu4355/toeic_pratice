@@ -1,38 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Document, Page, pdfjs } from 'react-pdf';
-import ReactCrop from 'react-image-crop';
-import 'react-image-crop/dist/ReactCrop.css';
+import React, { useState, useRef } from 'react';
 import './CreateExam.css';
 
-pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
-
-const TASKS = [
-  { id: 'part1_image_1', label: 'Part 1 - Ảnh Câu 1' },
-  { id: 'part1_image_2', label: 'Part 1 - Ảnh Câu 2' },
-  { id: 'part1_image_3', label: 'Part 1 - Ảnh Câu 3' },
-  { id: 'part1_image_4', label: 'Part 1 - Ảnh Câu 4' },
-  { id: 'part1_image_5', label: 'Part 1 - Ảnh Câu 5' },
-  { id: 'part1_image_6', label: 'Part 1 - Ảnh Câu 6' },
-  { id: 'part6_131_134', label: 'Part 6 - Đoạn văn (131-134)' },
-  { id: 'part6_135_138', label: 'Part 6 - Đoạn văn (135-138)' },
-  { id: 'part6_139_142', label: 'Part 6 - Đoạn văn (139-142)' },
-  { id: 'part6_143_146', label: 'Part 6 - Đoạn văn (143-146)' },
-  { id: 'part7_147_148', label: 'Part 7 - Đoạn đơn (147-148)' },
-  { id: 'part7_149_150', label: 'Part 7 - Đoạn đơn (149-150)' },
-  { id: 'part7_151_152', label: 'Part 7 - Đoạn đơn (151-152)' },
-  { id: 'part7_153_155', label: 'Part 7 - Đoạn đơn (153-155)' },
-  { id: 'part7_156_157', label: 'Part 7 - Đoạn đơn (156-157)' },
-  { id: 'part7_158_160', label: 'Part 7 - Đoạn đơn (158-160)' },
-  { id: 'part7_161_163', label: 'Part 7 - Đoạn kép (161-163)' },
-  { id: 'part7_164_167', label: 'Part 7 - Đoạn kép (164-167)' },
-  { id: 'part7_168_171', label: 'Part 7 - Đoạn kép (168-171)' },
-  { id: 'part7_172_175', label: 'Part 7 - Đoạn Kép (172-175)' },
-  { id: 'part7_176_180', label: 'Part 7 - Đoạn Kép (176-180)' },
-  { id: 'part7_181_185', label: 'Part 7 - Đoạn Kép (181-185)' },
-  { id: 'part7_186_190', label: 'Part 7 - Đoạn Ba (186-190)' },
-  { id: 'part7_191_195', label: 'Part 7 - Đoạn Ba (191-195)' },
-  { id: 'part7_196_200', label: 'Part 7 - Đoạn Ba (196-200)' },
-];
+// 💡 NHÚNG CÔNG CỤ SCAN DÙNG CHUNG VÀO ĐÂY
+import PdfScannerTool from '../../components/PdfScannerTool'; // Nhớ điều chỉnh lại đường dẫn này cho đúng với thư mục của bạn nhé
 
 const CreateExam = () => {
   const [step, setStep] = useState(1);
@@ -41,35 +11,14 @@ const CreateExam = () => {
   
   const [pdfFiles, setPdfFiles] = useState([]); 
   const [zipFile, setZipFile] = useState(null);
+  const [listeningKeyFile, setListeningKeyFile] = useState(null);
+  const [readingKeyFile, setReadingKeyFile] = useState(null);
   
   const pdfInputRef = useRef(null);
   const zipInputRef = useRef(null);
   
-  // Trạng thái cho Phòng cắt ảnh
-  const [currentPdfIndex, setCurrentPdfIndex] = useState(0); 
-  const [numPages, setNumPages] = useState(null);
-  const [pageNumber, setPageNumber] = useState(1);
-  const [inputPage, setInputPage] = useState(1); // TÍNH NĂNG MỚI: State cho ô nhập số trang
-  const [crop, setCrop] = useState();
-  
+  // STATE lưu trữ các ảnh được cắt ra từ Component PdfScannerTool
   const [completedCrops, setCompletedCrops] = useState({}); 
-  const [activeTaskId, setActiveTaskId] = useState(TASKS[0].id);
-
-  // Đồng bộ ô nhập liệu mỗi khi lật trang bằng nút Prev/Next
-  useEffect(() => {
-    setInputPage(pageNumber);
-  }, [pageNumber]);
-
-  // TÍNH NĂNG MỚI: Xử lý khi người dùng tự gõ số trang
-  const handlePageInputChange = (e) => {
-    const val = e.target.value;
-    setInputPage(val); // Cho phép hiển thị cả ô trống khi người dùng đang xóa số cũ
-    const parsed = parseInt(val, 10);
-    // Nếu gõ số hợp lệ (nằm trong khoảng 1 -> numPages) thì lật trang luôn
-    if (!isNaN(parsed) && parsed >= 1 && parsed <= (numPages || 1)) {
-      setPageNumber(parsed);
-    }
-  };
 
   const onPdfChange = (e) => {
     const files = Array.from(e.target.files);
@@ -85,9 +34,6 @@ const CreateExam = () => {
 
   const removePdf = (idx) => {
     setPdfFiles(prev => prev.filter((_, i) => i !== idx));
-    if (currentPdfIndex >= pdfFiles.length - 1) {
-       setCurrentPdfIndex(Math.max(0, pdfFiles.length - 2));
-    }
   };
 
   const onZipChange = (e) => {
@@ -95,64 +41,11 @@ const CreateExam = () => {
     if (zipInputRef.current) zipInputRef.current.value = "";
   };
 
-  const onDocumentLoadSuccess = ({ numPages }) => setNumPages(numPages);
-
   const goToCroppingRoom = (e) => {
     e.preventDefault();
-    if (pdfFiles.length === 0 || !zipFile) return alert('Vui lòng chọn đầy đủ file!');
+    if (pdfFiles.length === 0 || !zipFile) return alert('Vui lòng chọn đầy đủ file Đề thi và Audio!');
+    if (!listeningKeyFile || !readingKeyFile) return alert('Vui lòng tải lên đủ 2 file Đáp án (Listening & Reading)!');
     setStep(2);
-  };
-
-  const saveCropForTask = () => {
-    if (!crop || !crop.width || !crop.height) {
-      return alert("Vui lòng dùng chuột quét (vẽ khung) lên vùng đề thi trước!");
-    }
-
-    const pdfCanvas = document.querySelector('.react-pdf__Page__canvas');
-    if (!pdfCanvas) return;
-
-    const scaleX = pdfCanvas.width / pdfCanvas.clientWidth;
-    const scaleY = pdfCanvas.height / pdfCanvas.clientHeight;
-
-    const cropCanvas = document.createElement('canvas');
-    cropCanvas.width = crop.width * scaleX;
-    cropCanvas.height = crop.height * scaleY;
-    const ctx = cropCanvas.getContext('2d');
-
-    ctx.drawImage(
-      pdfCanvas,
-      crop.x * scaleX,
-      crop.y * scaleY,
-      crop.width * scaleX,
-      crop.height * scaleY,
-      0,
-      0,
-      crop.width * scaleX,
-      crop.height * scaleY
-    );
-
-    const base64Image = cropCanvas.toDataURL('image/jpeg', 1.0);
-
-    setCompletedCrops(prev => ({
-      ...prev,
-      [activeTaskId]: [...(prev[activeTaskId] || []), base64Image]
-    }));
-
-    setCrop(null); 
-  };
-
-  const removeCropImage = (taskId, imgIndex) => {
-    setCompletedCrops(prev => {
-      const updatedImages = (prev[taskId] || []).filter((_, idx) => idx !== imgIndex);
-      const newCrops = { ...prev };
-      
-      if (updatedImages.length > 0) {
-        newCrops[taskId] = updatedImages;
-      } else {
-        delete newCrops[taskId]; 
-      }
-      return newCrops;
-    });
   };
 
   const submitToBackend = async () => {
@@ -163,8 +56,11 @@ const CreateExam = () => {
       formData.append('duration', duration);
       formData.append('parts', JSON.stringify([1, 2, 3, 4, 5, 6, 7]));
       
-      pdfFiles.forEach(item => formData.append('files', item.rawFile));
-      formData.append('files', zipFile);
+      pdfFiles.forEach(item => formData.append('examFiles', item.rawFile));
+      formData.append('audioZip', zipFile);
+
+      if (listeningKeyFile) formData.append('listeningKey', listeningKeyFile);
+      if (readingKeyFile) formData.append('readingKey', readingKeyFile);
 
       for (const taskId of Object.keys(completedCrops)) {
         const imagesArray = completedCrops[taskId] || [];
@@ -181,7 +77,7 @@ const CreateExam = () => {
       });
 
       if (apiResponse.ok) {
-        alert("🚀 Đã đẩy đề lên hệ thống thành công!");
+        alert("🚀 Đã đẩy đề và Đáp án lên hệ thống thành công!");
         window.location.reload();
       } else {
         alert("Có lỗi xảy ra khi gửi dữ liệu!");
@@ -196,9 +92,10 @@ const CreateExam = () => {
   return (
     <div className="create-exam-container">
       
+      {/* ================= BƯỚC 1: UP FILE ================= */}
       {step === 1 && (
         <form className="setup-form" onSubmit={goToCroppingRoom}>
-          <h2 style={{color: '#5b51d8', marginBottom: '25px', textAlign: 'center'}}>📊 Đẩy Đề Thi Fullstack Lên Hệ Thống</h2>
+          <h2 style={{color: '#5b51d8', marginBottom: '25px', textAlign: 'center'}}>📊 Quản Lý Upload Đề Thi & Đáp Án</h2>
           <div className="form-group">
             <label>Tên Đề Thi TOEIC</label>
             <input type="text" value={examName} onChange={(e) => setExamName(e.target.value)} required placeholder="Ví dụ: ETS 2026 Test 1" />
@@ -207,8 +104,8 @@ const CreateExam = () => {
             <label>Thời gian làm bài (Phút)</label>
             <input type="number" value={duration} onChange={(e) => setDuration(Number(e.target.value))} required />
           </div>
-          <div className="form-group">
-            <label>📁 Tải lên File PDF Đề Thi (Có thể chọn nhiều file)</label>
+          <div className="form-group" style={{ background: '#f8fafc', padding: '15px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+            <label>📁 Tải lên File PDF Đề Thi (File chứa câu hỏi)</label>
             <input type="file" accept="application/pdf" multiple onChange={onPdfChange} ref={pdfInputRef} />
             {pdfFiles.length > 0 && (
               <ul className="selected-files-list">
@@ -221,7 +118,18 @@ const CreateExam = () => {
               </ul>
             )}
           </div>
-          <div className="form-group">
+
+          <div className="form-group" style={{ background: '#f0fdf4', padding: '15px', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
+            <label>🔑 Tải lên File PDF Đáp Án Listening (Key + Transcript)</label>
+            <input type="file" accept="application/pdf" onChange={(e) => setListeningKeyFile(e.target.files[0])} required />
+          </div>
+
+          <div className="form-group" style={{ background: '#f0fdf4', padding: '15px', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
+            <label>🔑 Tải lên File PDF Đáp Án Reading (Key + Giải thích)</label>
+            <input type="file" accept="application/pdf" onChange={(e) => setReadingKeyFile(e.target.files[0])} required />
+          </div>
+
+          <div className="form-group" style={{ background: '#eff6ff', padding: '15px', borderRadius: '8px', border: '1px solid #bfdbfe' }}>
             <label>🎵 Tải lên File ZIP Audio</label>
             <input type="file" accept=".zip" onChange={onZipChange} required={!zipFile} ref={zipInputRef} />
             {zipFile && (
@@ -231,94 +139,39 @@ const CreateExam = () => {
                </div>
             )}
           </div>
-          <button type="submit" className="btn-next-step">Tiếp tục: Vào Phòng Scan & Cắt Ảnh ➡️</button>
+          <button type="submit" className="btn-next-step">Tiếp tục: Vào Phòng Scan Đề ➡️</button>
         </form>
       )}
 
+      {/* ================= BƯỚC 2: CÔNG CỤ SCAN PDF ================= */}
       {step === 2 && (
-        <div className="cropping-room">
-          <div className="cropping-header">
-            <button className="btn-outline" onClick={() => setStep(1)}>🔙 Trở lại</button>
-            <h3>✂️ Hệ Thống Scan Đề Thi</h3>
-            <div className="pdf-switcher">
-              {pdfFiles.length > 1 && (
-                <select value={currentPdfIndex} onChange={(e) => { setCurrentPdfIndex(Number(e.target.value)); setPageNumber(1); setInputPage(1); }}>
-                  {pdfFiles.map((item, idx) => <option key={idx} value={idx}>{item.name}</option>)}
-                </select>
-              )}
-            </div>
-          </div>
+        <div style={{ maxWidth: '1000px', margin: '0 auto', background: '#fff', padding: '20px', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}>
+           
+           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+              <button type="button" onClick={() => setStep(1)} style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#f8fafc', cursor: 'pointer', fontWeight: 'bold', color: '#475569' }}>🔙 Trở lại Bước 1</button>
+              <h3 style={{ margin: 0, color: '#1e293b' }}>Phòng Scan & Gắn Ảnh</h3>
+           </div>
 
-          <div className="cropping-layout">
-            <div className="pdf-section">
-              <div className="pdf-nav">
-                <button type="button" disabled={pageNumber <= 1} onClick={() => setPageNumber(pageNumber - 1)}>⬅️ Trước</button>
-                
-                {/* TÍNH NĂNG MỚI: Ô NHẬP SỐ TRANG */}
-                <div className="page-input-wrapper">
-                  <span>Trang</span>
-                  <input 
-                    type="number" 
-                    className="page-input" 
-                    value={inputPage} 
-                    onChange={handlePageInputChange} 
-                    min={1} 
-                    max={numPages || 1} 
-                  />
-                  <span>/ {numPages || '--'}</span>
-                </div>
+           {/* 💡 SỬ DỤNG COMPONENT SCAN PDF DÙNG CHUNG */}
+           <PdfScannerTool
+             pdfFiles={pdfFiles}
+             completedCrops={completedCrops}
+             setCompletedCrops={setCompletedCrops}
+           />
 
-                <button type="button" disabled={pageNumber >= numPages} onClick={() => setPageNumber(pageNumber + 1)}>Sau ➡️</button>
-              </div>
-              <div className="pdf-canvas-wrapper">
-                <Document file={pdfFiles[currentPdfIndex]?.url} onLoadSuccess={onDocumentLoadSuccess} loading={<div className="loading-txt">Đang tải PDF...</div>}>
-                  <ReactCrop crop={crop} onChange={c => setCrop(c)}>
-                    <Page pageNumber={pageNumber} renderTextLayer={false} renderAnnotationLayer={false} width={700} devicePixelRatio={3} /* Phép thuật ở đây: Bắt PDF vẽ chi tiết gấp 3 lần bình thường */ />
-                  </ReactCrop>
-                </Document>
-              </div>
-            </div>
-
-            <div className="task-section">
-              <h4>Danh sách vị trí cần ảnh:</h4>
-              <div className="task-scroll-area">
-                {TASKS.map((task) => {
-                  const hasImages = completedCrops[task.id] && completedCrops[task.id].length > 0;
-                  return (
-                    <div key={task.id} className={`task-item-box ${activeTaskId === task.id ? 'active' : ''} ${hasImages ? 'done' : ''}`} onClick={() => setActiveTaskId(task.id)}>
-                      <div className="task-info">
-                        {hasImages ? '✅ ' : '⏳ '} {task.label}
-                      </div>
-                      
-                      {hasImages && (
-                        <div className="task-previews-container">
-                          {completedCrops[task.id].map((imgUrl, imgIdx) => (
-                            <div key={imgIdx} className="crop-preview-wrapper">
-                              <img src={imgUrl} alt="preview" className="crop-preview-mini" />
-                              <span className="btn-img-remove" onClick={(e) => {
-                                e.stopPropagation(); 
-                                removeCropImage(task.id, imgIdx);
-                              }}>✕</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-              <button type="button" className="btn-save" onClick={saveCropForTask}>📸 Lưu ảnh vào mục đang chọn</button>
-              <button type="button" className="btn-final" onClick={submitToBackend}>🚀 Hoàn tất & Gửi AI</button>
-            </div>
-          </div>
+           <div style={{ marginTop: '20px' }}>
+              <button type="button" onClick={submitToBackend} style={{ padding: '12px 30px', borderRadius: '8px', background: '#10b981', color: '#fff', border: 'none', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer', width: '100%' }}>🚀 Hoàn tất & Gửi AI Chấm</button>
+           </div>
         </div>
       )}
 
+      {/* ================= BƯỚC 3: MÀN HÌNH LOADING CHỜ AI ================= */}
       {step === 3 && (
         <div className="loading-screen">
           <div style={{textAlign: 'center'}}>
             <div style={{fontSize: '50px', marginBottom: '20px'}}>🤖</div>
-            <h2>AI Đang xử lý đề... Bạn vui lòng không đóng trình duyệt.</h2>
+            <h2>AI Đang xử lý Đề thi và Đáp án... Bạn vui lòng không đóng trình duyệt.</h2>
+            <p style={{marginTop: '10px', fontSize: '16px'}}>Quá trình này có thể mất 3-5 phút tùy vào độ dài của file Giải thích.</p>
           </div>
         </div>
       )}

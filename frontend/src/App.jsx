@@ -11,6 +11,7 @@ import Contact from "./pages/Contact/Contact";
 import CreateExam from "./pages/CreateExam/CreateExam";
 import AdminDashboard from "./pages/AdminDashboard/AdminDashboard";
 import TakingExam from "./pages/TakingExam/TakingExam";
+import ExamHistory from './pages/ExamHistory/ExamHistory';
 
 const App = () => {
   const [showLogin, setShowLogin] = useState(false);
@@ -53,6 +54,8 @@ const App = () => {
           <Route path="/admin" element={<AdminDashboard currentUser={currentUser} />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/taking-exam" element={<TakingExam />} />
+          <Route path="/history" element={<ExamHistory />} />
+
         </Routes>
         <Footer />
       </div>
