@@ -1,10 +1,11 @@
-import React, { useState, useRef } from 'react';
+import { useState, useRef } from 'react';
 import './CreateExam.css';
+import { API_BASE_URL, getAuthHeaders } from '../../config/api';
 
 // 💡 NHÚNG CÔNG CỤ SCAN DÙNG CHUNG VÀO ĐÂY
 import PdfScannerTool from '../../components/PdfScannerTool'; // Nhớ điều chỉnh lại đường dẫn này cho đúng với thư mục của bạn nhé
 
-const CreateExam = () => {
+const CreateExam = ({ currentUser }) => {
   const [step, setStep] = useState(1);
   const [examName, setExamName] = useState('');
   const [duration, setDuration] = useState(120);
@@ -19,6 +20,16 @@ const CreateExam = () => {
   
   // STATE lưu trữ các ảnh được cắt ra từ Component PdfScannerTool
   const [completedCrops, setCompletedCrops] = useState({}); 
+
+  if (currentUser !== undefined && currentUser?.role !== 'admin') {
+    return (
+      <div className="create-exam-container">
+        <div style={{ padding: '40px', textAlign: 'center', background: '#fff', borderRadius: '12px', border: '1px solid #fee2e2', color: '#991b1b' }}>
+          Bạn cần đăng nhập bằng tài khoản admin để tạo đề thi.
+        </div>
+      </div>
+    );
+  }
 
   const onPdfChange = (e) => {
     const files = Array.from(e.target.files);
@@ -71,8 +82,9 @@ const CreateExam = () => {
         }
       }
 
-      const apiResponse = await fetch("http://localhost:5000/api/upload-exam", {
+      const apiResponse = await fetch(`${API_BASE_URL}/api/upload-exam`, {
         method: "POST",
+        headers: getAuthHeaders(),
         body: formData
       });
 
@@ -83,7 +95,7 @@ const CreateExam = () => {
         alert("Có lỗi xảy ra khi gửi dữ liệu!");
         setStep(2);
       }
-    } catch (error) {
+    } catch {
       alert("Không thể kết nối đến máy chủ Backend!");
       setStep(2);
     }

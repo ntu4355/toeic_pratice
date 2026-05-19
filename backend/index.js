@@ -57,6 +57,36 @@ const fileManager = new GoogleAIFileManager(process.env.GEMINI_API_KEY);
 const upload = multer({ dest: 'uploads/' });
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+const authenticate = (req, res, next) => {
+    const authHeader = req.headers.authorization || "";
+    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+
+    if (!token) {
+        return res.status(401).json({ message: "Bạn cần đăng nhập để thực hiện thao tác này." });
+    }
+
+    try {
+        req.user = jwt.verify(token, JWT_SECRET);
+        next();
+    } catch {
+        return res.status(401).json({ message: "Phiên đăng nhập không hợp lệ hoặc đã hết hạn." });
+    }
+};
+
+const requireAdmin = (req, res, next) => {
+    if (req.user?.role !== "admin") {
+        return res.status(403).json({ message: "Bạn không có quyền quản trị." });
+    }
+    next();
+};
+
+const requireSameUserOrAdmin = (req, res, next) => {
+    if (req.user?.role === "admin" || String(req.user?.id) === String(req.params.userId)) {
+        return next();
+    }
+    return res.status(403).json({ message: "Bạn không có quyền xem dữ liệu này." });
+};
+
 const getAllAudioFiles = (dirPath, arrayOfFiles = []) => {
     const files = fs.readdirSync(dirPath);
     files.forEach(file => {
@@ -368,7 +398,7 @@ async function processExamInBackground(pdfFiles, examName, duration, partsArray,
 // ==========================================
 // API NHẬN FILE TỪ GIAO DIỆN (CREATE)
 // ==========================================
-app.post('/api/upload-exam', upload.any(), async (req, res) => {
+app.post('/api/upload-exam', authenticate, requireAdmin, upload.any(), async (req, res) => {
     try {
         const files = req.files;
         if (!files || files.length === 0) return res.status(400).json({ message: 'Thiếu file!' });
@@ -400,14 +430,14 @@ app.post('/api/upload-exam', upload.any(), async (req, res) => {
 app.get('/api/exams', async (req, res) => {
     try { res.json(await Exam.find().sort({ createdAt: -1 })); } catch (error) { res.status(500).json({ message: "Lỗi" }); }
 });
-app.delete('/api/exams/:id', async (req, res) => {
+app.delete('/api/exams/:id', authenticate, requireAdmin, async (req, res) => {
     try { await Exam.findByIdAndDelete(req.params.id); res.json({ message: "Đã xóa!" }); } catch (error) { res.status(500).json({ message: "Lỗi" }); }
 });
 
 // ==========================================
 // API MỚI: CẬP NHẬT & BỔ SUNG FILE CHO ĐỀ THI ĐÃ CÓ
 // ==========================================
-app.put('/api/exams/:id/append-files', upload.any(), async (req, res) => {
+app.put('/api/exams/:id/append-files', authenticate, requireAdmin, upload.any(), async (req, res) => {
     try {
         const examId = req.params.id;
         const files = req.files;
@@ -665,7 +695,11 @@ const resultSchema = new mongoose.Schema({
     examId: { type: mongoose.Schema.Types.ObjectId, ref: 'Exam' },
     examName: String,
     correctListening: Number,
+    wrongListening: Number,
+    totalListening: Number,
     correctReading: Number,
+    wrongReading: Number,
+    totalReading: Number,
     scoreListening: Number,
     scoreReading: Number,
     totalScore: Number,
@@ -675,9 +709,16 @@ const resultSchema = new mongoose.Schema({
 });
 const Result = mongoose.model('Result', resultSchema);
 
-app.post('/api/results', async (req, res) => {
+app.post('/api/results', authenticate, async (req, res) => {
     try {
-        const newResult = new Result(req.body);
+        const resultPayload = { ...req.body };
+        if (req.user.role !== "admin") {
+            resultPayload.userId = req.user.id;
+        } else if (!resultPayload.userId) {
+            resultPayload.userId = req.user.id;
+        }
+
+        const newResult = new Result(resultPayload);
         await newResult.save();
         res.status(201).json({ message: "Lưu lịch sử thành công!", result: newResult });
     } catch (error) { 
@@ -685,7 +726,7 @@ app.post('/api/results', async (req, res) => {
     }
 });
 
-app.get('/api/results/user/:userId', async (req, res) => {
+app.get('/api/results/user/:userId', authenticate, requireSameUserOrAdmin, async (req, res) => {
     try {
         const results = await Result.find({ userId: req.params.userId }).sort({ createdAt: -1 });
         res.json(results);
@@ -700,11 +741,13 @@ app.get('/api/results/user/:userId', async (req, res) => {
 app.post('/api/register', async (req, res) => {
     try {
         const { name, email, password, role } = req.body;
-        const existingUser = await User.findOne({ email });
+        const normalizedEmail = String(email || "").trim().toLowerCase();
+        const existingUser = await User.findOne({ email: normalizedEmail });
         if (existingUser) return res.status(400).json({ message: "Email đã dùng!" });
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
-        const newUser = new User({ name, email, password: hashedPassword, role: role || 'user' });
+        const safeRole = role === "admin" && normalizedEmail === "admin@toeic.com" ? "admin" : "user";
+        const newUser = new User({ name, email: normalizedEmail, password: hashedPassword, role: safeRole });
         await newUser.save();
         res.status(201).json({ message: "Thành công!" });
     } catch (error) { res.status(500).json({ message: "Lỗi" }); }
@@ -713,7 +756,8 @@ app.post('/api/register', async (req, res) => {
 app.post('/api/login', async (req, res) => {
     try {
         const { email, password } = req.body;
-        const user = await User.findOne({ email });
+        const normalizedEmail = String(email || "").trim().toLowerCase();
+        const user = await User.findOne({ email: normalizedEmail });
         if (!user) return res.status(404).json({ message: "Không tìm thấy!" });
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) return res.status(400).json({ message: "Sai mật khẩu!" });
@@ -722,7 +766,7 @@ app.post('/api/login', async (req, res) => {
     } catch (error) { res.status(500).json({ message: "Lỗi" }); }
 });
 
-app.get('/api/users', async (req, res) => {
+app.get('/api/users', authenticate, requireAdmin, async (req, res) => {
     try { res.status(200).json(await User.find().select('-password')); } catch (error) { res.status(500).json({ message: "Lỗi" }); }
 });
 

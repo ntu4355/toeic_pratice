@@ -1,6 +1,7 @@
-import React, { useState, useRef } from 'react';
+import { useState, useRef } from 'react';
 // IMPORT TOOL SCAN PDF MÀ CHÚNG TA VỪA TẠO
 import PdfScannerTool from '../../components/PdfScannerTool'; // Đổi đường dẫn cho phù hợp thư mục của bạn
+import { API_BASE_URL, getAuthHeaders } from '../../config/api';
 
 const EditExamModal = ({ exam, onClose, onRefresh }) => {
   const [step, setStep] = useState(1); 
@@ -56,8 +57,9 @@ const EditExamModal = ({ exam, onClose, onRefresh }) => {
         }
       }
 
-      const response = await fetch(`http://localhost:5000/api/exams/${exam._id}/append-files`, {
+      const response = await fetch(`${API_BASE_URL}/api/exams/${exam._id}/append-files`, {
         method: 'PUT',
+        headers: getAuthHeaders(),
         body: formData
       });
 
@@ -65,7 +67,7 @@ const EditExamModal = ({ exam, onClose, onRefresh }) => {
       alert(data.message); 
       onRefresh(); 
       onClose();   
-    } catch (error) {
+    } catch {
       alert("Lỗi kết nối đến máy chủ!");
     } finally {
       setIsUpdating(false);

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import ReactCrop from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
@@ -46,9 +46,10 @@ const PdfScannerTool = ({ pdfFiles, completedCrops, setCompletedCrops }) => {
   const [crop, setCrop] = useState();
   const [activeTaskId, setActiveTaskId] = useState(TASKS[0].id);
 
-  useEffect(() => {
-    setInputPage(pageNumber);
-  }, [pageNumber]);
+  const goToPage = (nextPage) => {
+    setPageNumber(nextPage);
+    setInputPage(nextPage);
+  };
 
   const handlePageInputChange = (e) => {
     const val = e.target.value;
@@ -135,13 +136,13 @@ const PdfScannerTool = ({ pdfFiles, completedCrops, setCompletedCrops }) => {
         {/* KHU VỰC HIỂN THỊ FILE PDF (BÊN TRÁI) */}
         <div className="pdf-section" style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#e2e8f0' }}>
           <div className="pdf-nav" style={{ padding: '10px 15px', background: '#ffffff', borderBottom: '1px solid #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <button type="button" disabled={pageNumber <= 1} onClick={() => setPageNumber(pageNumber - 1)} style={{ padding: '6px 14px', background: '#fff', border: '1px solid #cbd5e1', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>⬅️ Trước</button>
+            <button type="button" disabled={pageNumber <= 1} onClick={() => goToPage(pageNumber - 1)} style={{ padding: '6px 14px', background: '#fff', border: '1px solid #cbd5e1', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>⬅️ Trước</button>
             <div className="page-input-wrapper" style={{ margin: '0 15px', display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span style={{ fontSize: '13.5px', color: '#475569', fontWeight: '500' }}>Trang</span>
               <input type="number" className="page-input" value={inputPage} onChange={handlePageInputChange} min={1} max={numPages || 1} style={{ width: '55px', padding: '5px', textAlign: 'center', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '14px', fontWeight: '600', outline: 'none' }} />
               <span style={{ fontSize: '13.5px', color: '#475569', fontWeight: '500' }}>/ {numPages || '--'}</span>
             </div>
-            <button type="button" disabled={pageNumber >= numPages} onClick={() => setPageNumber(pageNumber + 1)} style={{ padding: '6px 14px', background: '#fff', border: '1px solid #cbd5e1', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>Sau ➡️</button>
+            <button type="button" disabled={pageNumber >= numPages} onClick={() => goToPage(pageNumber + 1)} style={{ padding: '6px 14px', background: '#fff', border: '1px solid #cbd5e1', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>Sau ➡️</button>
           </div>
           
           {/* Vùng cuộn PDF rộng rãi */}

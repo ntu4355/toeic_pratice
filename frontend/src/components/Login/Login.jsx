@@ -1,6 +1,7 @@
 import "./Login.css";
 import { assets } from "../../assets/assets";
 import { useState, useEffect } from "react";
+import { API_BASE_URL } from "../../config/api";
 
 const LOGIN_STATE = "Đăng nhập";
 const REGISTER_STATE = "Đăng ký";
@@ -43,7 +44,7 @@ const Login = ({ setShowLogin, setCurrentUser }) => {
     const seedMockUsers = async () => {
       for (const user of DEFAULT_USERS) {
         try {
-          await fetch("http://localhost:5000/api/register", {
+          await fetch(`${API_BASE_URL}/api/register`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -53,7 +54,7 @@ const Login = ({ setShowLogin, setCurrentUser }) => {
               role: user.role
             }),
           });
-        } catch (error) {
+      } catch (error) {
           console.error("Lỗi khi tạo tài khoản mẫu:", error);
         }
       }
@@ -89,7 +90,7 @@ const Login = ({ setShowLogin, setCurrentUser }) => {
     // ==========================================
     if (currState === LOGIN_STATE) {
       try {
-        const response = await fetch("http://localhost:5000/api/login", {
+        const response = await fetch(`${API_BASE_URL}/api/login`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email: normalizedEmail, password }),
@@ -122,7 +123,7 @@ const Login = ({ setShowLogin, setCurrentUser }) => {
           setError(data.message || "Email hoặc mật khẩu không đúng.");
           return;
         }
-      } catch (err) {
+      } catch {
         setError("Lỗi kết nối đến máy chủ Database.");
         return;
       }
@@ -148,7 +149,7 @@ const Login = ({ setShowLogin, setCurrentUser }) => {
     }
 
     try {
-      const response = await fetch("http://localhost:5000/api/register", {
+      const response = await fetch(`${API_BASE_URL}/api/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -169,7 +170,7 @@ const Login = ({ setShowLogin, setCurrentUser }) => {
       } else {
         setError(data.message || "Email này đã được sử dụng. Vui lòng thử email khác.");
       }
-    } catch (err) {
+    } catch {
       setError("Lỗi kết nối đến máy chủ Database.");
     }
   };

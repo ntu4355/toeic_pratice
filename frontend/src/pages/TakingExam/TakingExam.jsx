@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import "./TakingExam.css";
+import { API_BASE_URL, getAuthHeaders } from "../../config/api";
 
 const partsConfig = [
   { id: 1, title: "Part 1", start: 1, end: 6 },
@@ -23,13 +24,38 @@ const getReadingScore = (correct) => {
     return Math.round((correct * 5.1) / 5) * 5; 
 };
 
+const optionLabelRegex = /^\([A-D]\)$/;
+
+const ExplanationContent = ({ text }) => {
+  const safeText = text || "(Chưa có giải thích cho câu này)";
+  const lines = safeText.split("\n");
+
+  return lines.map((line, lineIndex) => (
+    <Fragment key={`${lineIndex}-${line}`}>
+      {line.split(/(\([A-D]\))/g).map((part, partIndex) =>
+        optionLabelRegex.test(part) ? (
+          <strong key={`${lineIndex}-${partIndex}`} style={{ color: "#d97706", fontSize: "15px" }}>
+            {part}
+          </strong>
+        ) : (
+          <Fragment key={`${lineIndex}-${partIndex}`}>{part}</Fragment>
+        ),
+      )}
+      {lineIndex < lines.length - 1 ? <br /> : null}
+    </Fragment>
+  ));
+};
+
 const TakingExam = () => {
   const navigate = useNavigate();
   const location = useLocation();
   
   const examId = location.state?.examId;
   const isReviewMode = location.state?.isReviewMode || false;
-  const selectedParts = isReviewMode ? [] : (location.state?.selectedParts || []); 
+  const selectedParts = useMemo(
+    () => (isReviewMode ? [] : location.state?.selectedParts || []),
+    [isReviewMode, location.state],
+  ); 
 
   const [examInfo, setExamInfo] = useState(null);
   const [questions, setQuestions] = useState([]);
@@ -45,6 +71,88 @@ const TakingExam = () => {
     totalScore: 0, timeSpent: 0 
   });
 
+  const calculateScore = useCallback(async () => {
+    if (!examInfo) return;
+
+    let correctL = 0, wrongL = 0, correctR = 0, wrongR = 0;
+    let totalL = 0, totalR = 0;
+    
+    questions.forEach(q => {
+      const userAns = answers[q.QuestionNo]?.trim().toUpperCase();
+      const correctAns = q.CorrectAnswer?.trim().toUpperCase();
+      const isListening = q.QuestionNo <= 100;
+
+      if (isListening) totalL++; else totalR++;
+
+      if (userAns) {
+        if (userAns === correctAns) {
+          isListening ? correctL++ : correctR++;
+        } else {
+          isListening ? wrongL++ : wrongR++;
+        }
+      } else {
+          isListening ? wrongL++ : wrongR++;
+      }
+    });
+
+    const projectedCorrectL = totalL > 0 ? Math.round((correctL / totalL) * 100) : 0;
+    const projectedCorrectR = totalR > 0 ? Math.round((correctR / totalR) * 100) : 0;
+
+    const scoreL = totalL > 0 ? getListeningScore(projectedCorrectL) : 0;
+    const scoreR = totalR > 0 ? getReadingScore(projectedCorrectR) : 0;
+    const totalScore = scoreL + scoreR;
+    const timeSpent = ((examInfo.duration || 120) * 60) - timeLeft; 
+
+    const finalScoreInfo = {
+      correctL,
+      wrongL,
+      scoreL,
+      correctR,
+      wrongR,
+      scoreR,
+      totalScore,
+      timeSpent,
+      totalListening: totalL,
+      totalReading: totalR,
+    };
+    setScoreInfo(finalScoreInfo);
+    setIsSubmitted(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    const user = JSON.parse(localStorage.getItem('currentUser') || '{}');
+    const userId = user.id || user._id;
+
+    if (userId) {
+        try {
+            await fetch(`${API_BASE_URL}/api/results`, {
+                method: 'POST',
+                headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+                body: JSON.stringify({
+                    userId: userId,
+                    examId: examInfo._id || examInfo.id,
+                    examName: examInfo.name,
+                    correctListening: correctL,
+                    wrongListening: wrongL,
+                    totalListening: totalL,
+                    correctReading: correctR,
+                    wrongReading: wrongR,
+                    totalReading: totalR,
+                    scoreListening: scoreL,
+                    scoreReading: scoreR,
+                    totalScore: totalScore,
+                    timeSpent: timeSpent,
+                    userAnswers: answers 
+                })
+            });
+        } catch (err) { console.error("Lỗi lưu lịch sử", err); }
+    }
+  }, [answers, examInfo, questions, timeLeft]);
+
+  const handleAutoSubmit = useCallback(() => {
+    alert("Hết giờ làm bài! Hệ thống đang tự động nộp bài...");
+    void calculateScore();
+  }, [calculateScore]);
+
   useEffect(() => {
     if (!examId) {
       alert("Không tìm thấy thông tin đề thi!");
@@ -52,7 +160,7 @@ const TakingExam = () => {
       return;
     }
 
-    fetch("http://localhost:5000/api/exams")
+    fetch(`${API_BASE_URL}/api/exams`)
       .then((res) => res.json())
       .then((data) => {
         const currentExam = data.find((e) => String(e._id) === String(examId) || String(e.id) === String(examId));
@@ -85,18 +193,19 @@ const TakingExam = () => {
         }
       })
       .catch((err) => console.error("Lỗi khi tải đề thi:", err));
-  }, [examId, navigate]); 
+  }, [examId, navigate, selectedParts]); 
 
   useEffect(() => {
     if (isReviewMode) return; 
     if (timeLeft <= 0 && !isSubmitted) {
-      handleAutoSubmit();
+      const submitTimer = window.setTimeout(handleAutoSubmit, 0);
+      return () => window.clearTimeout(submitTimer);
     }
     if (isSubmitted) return; 
     
     const timer = setInterval(() => setTimeLeft((prev) => prev - 1), 1000);
     return () => clearInterval(timer);
-  }, [timeLeft, isSubmitted, isReviewMode]);
+  }, [timeLeft, isSubmitted, isReviewMode, handleAutoSubmit]);
 
   const formatTime = (seconds) => {
     const m = Math.floor(seconds / 60);
@@ -109,78 +218,13 @@ const TakingExam = () => {
     setAnswers((prev) => ({ ...prev, [questionNo]: optionLetter }));
   };
 
-  const calculateScore = async () => {
-    let correctL = 0, wrongL = 0, correctR = 0, wrongR = 0;
-    let totalL = 0, totalR = 0;
-    
-    questions.forEach(q => {
-      const userAns = answers[q.QuestionNo]?.trim().toUpperCase();
-      const correctAns = q.CorrectAnswer?.trim().toUpperCase();
-      const isListening = q.QuestionNo <= 100;
-
-      if (isListening) totalL++; else totalR++;
-
-      if (userAns) {
-        if (userAns === correctAns) {
-          isListening ? correctL++ : correctR++;
-        } else {
-          isListening ? wrongL++ : wrongR++;
-        }
-      } else {
-          isListening ? wrongL++ : wrongR++;
-      }
-    });
-
-    const projectedCorrectL = totalL > 0 ? Math.round((correctL / totalL) * 100) : 0;
-    const projectedCorrectR = totalR > 0 ? Math.round((correctR / totalR) * 100) : 0;
-
-    const scoreL = totalL > 0 ? getListeningScore(projectedCorrectL) : 0;
-    const scoreR = totalR > 0 ? getReadingScore(projectedCorrectR) : 0;
-    const totalScore = scoreL + scoreR;
-    const timeSpent = (examInfo.duration * 60) - timeLeft; 
-
-    const finalScoreInfo = { correctL, wrongL, scoreL, correctR, wrongR, scoreR, totalScore, timeSpent };
-    setScoreInfo(finalScoreInfo);
-    setIsSubmitted(true);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-
-    const user = JSON.parse(localStorage.getItem('currentUser') || '{}');
-    const userId = user.id || user._id;
-
-    if (userId) {
-        try {
-            await fetch('http://localhost:5000/api/results', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    userId: userId,
-                    examId: examInfo._id || examInfo.id,
-                    examName: examInfo.name,
-                    correctListening: correctL,
-                    correctReading: correctR,
-                    scoreListening: scoreL,
-                    scoreReading: scoreR,
-                    totalScore: totalScore,
-                    timeSpent: timeSpent,
-                    userAnswers: answers 
-                })
-            });
-        } catch (err) { console.error("Lỗi lưu lịch sử", err); }
-    }
-  };
-
-  const handleAutoSubmit = () => {
-    alert("Hết giờ làm bài! Hệ thống đang tự động nộp bài...");
-    calculateScore();
-  };
-
   const handleManualSubmit = () => {
     if (isSubmitted || isReviewMode) {
        navigate("/history"); 
        return;
     }
     if (window.confirm("Bạn có chắc chắn muốn nộp bài ngay bây giờ?")) {
-      calculateScore();
+      void calculateScore();
     }
   };
 
@@ -233,21 +277,29 @@ const TakingExam = () => {
     <div className="taking-exam-container">
       
       <div className="exam-content-col">
+        {/* ================= GIAO DIỆN KẾT QUẢ KIỂM TRA ĐÃ ĐƯỢC TỐI ƯU HÓA HOÀN HẢO ================= */}
         {isSubmitted && (
           <div className="result-dashboard-card">
-            <h2 style={{ textAlign: 'center', color: '#1e3a8a', marginBottom: '30px', fontSize: '26px', fontWeight: '800', letterSpacing: '-0.5px' }}>
+            <h2 style={{ textAlign: 'center', color: '#1e3a8a', margin: '0 0 5px 0', fontSize: '24px', fontWeight: '800', letterSpacing: '-0.5px' }}>
                {isReviewMode ? "🔍 CHI TIẾT BÀI LÀM CŨ" : "🎉 KẾT QUẢ KIỂM TRA"}
             </h2>
+            <p style={{ textAlign: 'center', color: '#64748b', fontSize: '14px', margin: '0 0 25px 0' }}>
+              Hệ thống tự động chấm điểm và quy đổi TOEIC theo công thức ước lượng trong bản test
+            </p>
             
-            <div style={{ display: 'flex', gap: '25px', flexWrap: 'wrap', justifyContent: 'center' }}>
+            <div className="result-dashboard-grid">
+              
+              {/* CỘT ĐIỂM TỔNG SỐ BÊN TRÁI */}
               <div className="score-summary-box">
-                <div style={{ fontSize: '14px', color: '#64748b', fontWeight: '700', letterSpacing: '1px' }}>TỔNG ĐIỂM</div>
+                <div className="total-label">TỔNG ĐIỂM</div>
                 <div className="total-score-value">{scoreInfo.totalScore}</div>
-                <div style={{ fontSize: '15px', color: '#94a3b8', fontWeight: '600' }}>/ 990 Điểm</div>
-                <div style={{ width: '100%', height: '1px', background: '#e2e8f0', margin: '20px 0' }}></div>
-                <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '14px', color: '#475569' }}>
+                <div className="total-max">/ 990 Điểm</div>
+                
+                <div style={{ width: '100%', height: '1px', background: '#e2e8f0', margin: '18px 0' }}></div>
+                
+                <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13.5px', color: '#475569' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>⏱ Thời gian:</span>
+                    <span>⏱ Thời gian làm:</span>
                     <strong style={{ color: '#1e293b' }}>{Math.floor(scoreInfo.timeSpent / 60)} phút {scoreInfo.timeSpent % 60} giây</strong>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -257,31 +309,44 @@ const TakingExam = () => {
                 </div>
               </div>
 
-              <div style={{ flex: '2', minWidth: '340px', display: 'flex', flexDirection: 'column', gap: '16px', justifyContent: 'center' }}>
+              {/* CỘT THỐNG KÊ CHI TIẾT THEO KỸ NĂNG BÊN PHẢI */}
+              <div className="section-score-container">
+                
+                {/* THẺ ĐIỂM LISTENING */}
                 <div className="section-score-card card-listening">
                   <div>
-                    <h4 style={{ color: '#1e40af', margin: '0 0 6px 0', fontSize: '17px', fontWeight: '700' }}>🎧 Phần thi Listening</h4>
-                    <div style={{ fontSize: '13.5px', color: '#4b5563' }}>
-                      <span style={{ color: '#15803d', fontWeight: '700' }}>{scoreInfo.correctL} câu đúng</span>
-                      <span style={{ color: '#9ca3af', margin: '0 8px' }}>|</span>
-                      <span style={{ color: '#b91c1c', fontWeight: '700' }}>{scoreInfo.wrongL} câu sai</span>
+                    <h4>🎧 Phần thi Listening</h4>
+                    <div className="section-score-meta">
+                      <span style={{ color: '#16a34a', fontWeight: '700' }}>{scoreInfo.correctL} câu đúng</span>
+                      <span style={{ color: '#cbd5e1', margin: '0 8px' }}>|</span>
+                      <span style={{ color: '#ef4444', fontWeight: '700' }}>{scoreInfo.wrongL} câu sai/bỏ qua</span>
                     </div>
                   </div>
-                  <div style={{ fontSize: '32px', fontWeight: '900', color: '#1d4ed8' }}>{scoreInfo.scoreL}</div>
+                  <div className="section-score-value">
+                    {scoreInfo.scoreL} <span className="section-score-max">/ 495</span>
+                  </div>
                 </div>
 
+                {/* THẺ ĐIỂM READING */}
                 <div className="section-score-card card-reading">
                   <div>
-                    <h4 style={{ color: '#166534', margin: '0 0 6px 0', fontSize: '17px', fontWeight: '700' }}>📖 Phần thi Reading</h4>
-                    <div style={{ fontSize: '13.5px', color: '#4b5563' }}>
-                      <span style={{ color: '#15803d', fontWeight: '700' }}>{scoreInfo.correctR} câu đúng</span>
-                      <span style={{ color: '#9ca3af', margin: '0 8px' }}>|</span>
-                      <span style={{ color: '#b91c1c', fontWeight: '700' }}>{scoreInfo.wrongR} câu sai</span>
+                    <h4>📖 Phần thi Reading</h4>
+                    <div className="section-score-meta">
+                      <span style={{ color: '#16a34a', fontWeight: '700' }}>{scoreInfo.correctR} câu đúng</span>
+                      <span style={{ color: '#cbd5e1', margin: '0 8px' }}>|</span>
+                      <span style={{ color: '#ef4444', fontWeight: '700' }}>{scoreInfo.wrongR} câu sai/bỏ qua</span>
                     </div>
                   </div>
-                  <div style={{ fontSize: '32px', fontWeight: '900', color: '#15803d' }}>{scoreInfo.scoreR}</div>
+                  <div className="section-score-value">
+                    {scoreInfo.scoreR} <span className="section-score-max">/ 495</span>
+                  </div>
                 </div>
+
               </div>
+            </div>
+            
+            <div style={{ textAlign: 'center', marginTop: '25px', fontSize: '13.5px', color: '#475569', background: '#f8fafc', padding: '12px', borderRadius: '10px', border: '1px solid #e2e8f0', fontStyle: 'italic' }}>
+              💡 Cuộn xuống dưới hoặc dùng bảng câu hỏi bên phải để nhảy nhanh đến câu muốn xem lời giải thích chi tiết nhé!
             </div>
           </div>
         )}
@@ -344,14 +409,9 @@ const TakingExam = () => {
                       {isSubmitted && (
                         <div className="explanation-box">
                           <div className="explain-title">💡 Giải thích chi tiết:</div>
-                          <div 
-                            className="explain-content" 
-                            dangerouslySetInnerHTML={{ 
-                              __html: (q.Explanation || "(Chưa có giải thích cho câu này)")
-                                .replace(/\n/g, '<br/>')
-                                .replace(/(\([A-D]\))/g, '<br/><strong style="color: #d97706; font-size: 15px;">$1</strong>') 
-                            }} 
-                          />
+                          <div className="explain-content">
+                            <ExplanationContent text={q.Explanation} />
+                          </div>
                         </div>
                       )}
                     </div>
@@ -412,14 +472,9 @@ const TakingExam = () => {
                   {isSubmitted && (
                     <div className="explanation-box">
                       <div className="explain-title">💡 Giải thích chi tiết:</div>
-                      <div 
-                        className="explain-content" 
-                        dangerouslySetInnerHTML={{ 
-                          __html: (q.Explanation || "(Chưa có giải thích cho câu này)")
-                            .replace(/\n/g, '<br/>')
-                            .replace(/(\([A-D]\))/g, '<br/><strong style="color: #d97706; font-size: 15px;">$1</strong>') 
-                        }} 
-                      />
+                      <div className="explain-content">
+                        <ExplanationContent text={q.Explanation} />
+                      </div>
                     </div>
                   )}
                 </div>

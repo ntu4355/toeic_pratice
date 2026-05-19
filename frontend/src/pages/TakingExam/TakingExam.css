@@ -423,3 +423,161 @@
   color: #94a3b8;
   border-style: dashed;
 }
+/* ===================================================
+   TỐI ƯU GIAO DIỆN KẾT QUẢ THI MODERN DASHBOARD
+   =================================================== */
+
+/* Khung bọc tổng thể kết quả thi */
+.result-dashboard-card {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 30px;
+  box-shadow: 0 10px 30px rgba(79, 70, 229, 0.06);
+  margin-bottom: 30px;
+  border-top: 6px solid #2563eb;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/* Container chia 2 cột kết quả */
+.result-dashboard-grid {
+  display: flex;
+  gap: 25px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+/* Khung điểm số tổng bên trái */
+.score-summary-box {
+  flex: 1;
+  min-width: 250px;
+  background: linear-gradient(145deg, #f8fafc, #f1f5f9);
+  padding: 25px;
+  border-radius: 14px;
+  text-align: center;
+  border: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.score-summary-box .total-label {
+  font-size: 13px;
+  color: #64748b;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+}
+
+.score-summary-box .total-score-value {
+  font-size: 58px;
+  color: #2563eb;
+  font-weight: 900;
+  letter-spacing: -1.5px;
+  margin: 5px 0;
+  text-shadow: 0 2px 4px rgba(37, 99, 235, 0.1);
+}
+
+.score-summary-box .total-max {
+  font-size: 14px;
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+/* Các thẻ chi tiết Listening & Reading */
+.section-score-container {
+  flex: 2;
+  min-width: 340px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  justify-content: center;
+}
+
+.section-score-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-radius: 14px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.section-score-card:hover {
+  transform: translateY(-2px);
+}
+
+.card-listening {
+  background: #eff6ff;
+  border-left: 6px solid #3b82f6;
+  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.04);
+}
+
+.card-reading {
+  background: #f0fdf4;
+  border-left: 6px solid #22c55e;
+  box-shadow: 0 4px 15px rgba(34, 197, 94, 0.04);
+}
+
+.section-score-card h4 {
+  margin: 0 0 6px 0;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.card-listening h4 { color: #1e40af; }
+.card-reading h4 { color: #166534; }
+
+.section-score-meta {
+  font-size: 13.5px;
+  color: #4b5563;
+}
+
+.section-score-value {
+  font-size: 32px;
+  font-weight: 900;
+}
+
+.card-listening .section-score-value { color: #1d4ed8; }
+.card-reading .section-score-value { color: #15803d; }
+
+.section-score-max {
+  font-size: 14px;
+  color: #94a3b8;
+  font-weight: normal;
+}
+
+/* ===================================================
+   HỘP GIẢI THÍCH CHI TIẾT DƯỚI MỖI CÂU HỎI
+   =================================================== */
+.explanation-box {
+  background: #fffbeb;
+  border-left: 4px solid #f59e0b;
+  border-radius: 10px;
+  padding: 18px 22px;
+  margin-top: 20px;
+  box-shadow: inset 0 2px 4px rgba(245, 158, 11, 0.01);
+  border: 1px solid #fef3c7;
+}
+
+.explain-title {
+  font-weight: 800;
+  color: #b45309;
+  margin-bottom: 10px;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.explain-content {
+  font-size: 14.5px;
+  color: #451a03;
+  line-height: 1.7;
+}
+
+.explain-content br {
+  margin-bottom: 6px;
+  display: block;
+  content: "";
+}

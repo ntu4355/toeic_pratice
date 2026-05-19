@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import './AdminDashboard.css';
 import CreateExam from '../CreateExam/CreateExam';
 import EditExamModal from "./EditExamModal";
+import { API_BASE_URL, getAuthHeaders } from '../../config/api';
 
 const AdminDashboard = ({ currentUser }) => {
   const [activeTab, setActiveTab] = useState('overview');
@@ -12,7 +13,7 @@ const AdminDashboard = ({ currentUser }) => {
   // Kéo dữ liệu đề thi từ MongoDB
   const fetchExams = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/exams');
+      const response = await fetch(`${API_BASE_URL}/api/exams`);
       const data = await response.json();
       setExams(data);
     } catch (error) {
@@ -23,7 +24,9 @@ const AdminDashboard = ({ currentUser }) => {
   // LOGIC MỚI: Kéo dữ liệu người dùng từ MongoDB (Thay thế localStorage)
   const fetchUsers = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/users');
+      const response = await fetch(`${API_BASE_URL}/api/users`, {
+        headers: getAuthHeaders(),
+      });
       const data = await response.json();
       setUsers(data);
     } catch (error) {
@@ -32,8 +35,12 @@ const AdminDashboard = ({ currentUser }) => {
   };
 
   useEffect(() => {
-    fetchExams();
-    fetchUsers(); // Gọi thẳng lên Backend để lấy User thật
+    const timer = window.setTimeout(() => {
+      void fetchExams();
+      void fetchUsers(); // Gọi thẳng lên Backend để lấy User thật
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, []);
 
   if (!currentUser || currentUser.role !== 'admin') {
@@ -48,7 +55,10 @@ const AdminDashboard = ({ currentUser }) => {
   const handleDeleteExam = async (id) => {
     if (window.confirm("Bạn có chắc chắn muốn xóa đề thi này không? Dữ liệu sẽ mất vĩnh viễn!")) {
       try {
-        const response = await fetch(`http://localhost:5000/api/exams/${id}`, { method: 'DELETE' });
+        const response = await fetch(`${API_BASE_URL}/api/exams/${id}`, {
+          method: 'DELETE',
+          headers: getAuthHeaders(),
+        });
         if (response.ok) {
           alert("Xóa thành công!");
           fetchExams(); 
@@ -68,7 +78,7 @@ const AdminDashboard = ({ currentUser }) => {
       <div className="admin-banner-gradient">
         <div className="admin-banner-content">
           <h1>👨‍💼 Admin Dashboard</h1>
-          <p>Chào mừng, {currentUser?.name || "Admin TOEIC"}</p>
+          <p>Chào mừng, {currentUser?.fullName || currentUser?.name || "Admin TOEIC"}</p>
         </div>
       </div>
 

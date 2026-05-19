@@ -1,6 +1,7 @@
 import "./Exam.css";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { API_BASE_URL } from "../../config/api";
 
 // Chỉ giữ lại cấu trúc các Part của bài thi TOEIC
 const parts = [
@@ -23,7 +24,7 @@ const Exam = () => {
   useEffect(() => {
     const fetchExams = async () => {
       try {
-        const response = await fetch("http://localhost:5000/api/exams");
+        const response = await fetch(`${API_BASE_URL}/api/exams`);
         const data = await response.json();
         
         // SỬA TẠI ĐÂY: Quét cả _id lẫn id để đảm bảo luôn lấy được mã đề thi

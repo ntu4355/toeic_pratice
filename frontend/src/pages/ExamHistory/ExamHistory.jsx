@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { API_BASE_URL, getAuthHeaders } from "../../config/api";
 
 const ExamHistory = () => {
   const navigate = useNavigate();
@@ -8,35 +9,48 @@ const ExamHistory = () => {
   const [debugMessage, setDebugMessage] = useState("");
 
   useEffect(() => {
-    const userRaw = localStorage.getItem("currentUser");
-    if (!userRaw) {
-      setDebugMessage("Không tìm thấy trạng thái đăng nhập. Vui lòng thử đăng xuất và đăng nhập lại!");
-      setLoading(false);
-      return;
-    }
-
-    const user = JSON.parse(userRaw);
-    const userId = user.id || user._id;
-
-    if (!userId) {
-      setDebugMessage("Dữ liệu tài khoản lỗi cấu trúc ID.");
-      setLoading(false);
-      return;
-    }
-    
-    fetch(`http://localhost:5000/api/results/user/${userId}`)
-      .then((res) => res.json())
-      .then((data) => {
-        setHistory(data);
+    const loadHistory = async () => {
+      const userRaw = localStorage.getItem("currentUser");
+      if (!userRaw) {
+        setDebugMessage("Không tìm thấy trạng thái đăng nhập. Vui lòng thử đăng xuất và đăng nhập lại!");
         setLoading(false);
-      })
-      .catch((err) => {
+        return;
+      }
+
+      const user = JSON.parse(userRaw);
+      const userId = user.id || user._id;
+
+      if (!userId) {
+        setDebugMessage("Dữ liệu tài khoản lỗi cấu trúc ID.");
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/results/user/${userId}`, {
+          headers: getAuthHeaders(),
+        });
+
+        if (!response.ok) {
+          throw new Error("Cannot load exam history");
+        }
+
+        const data = await response.json();
+        setHistory(Array.isArray(data) ? data : []);
+      } catch {
         setDebugMessage("Lỗi kết nối máy chủ dữ liệu Backend.");
+      } finally {
         setLoading(false);
-      });
+      }
+    };
+
+    void loadHistory();
   }, []);
 
   const handleReviewExam = (item) => {
+     const wrongListening = item.wrongListening ?? Math.max(0, (item.totalListening ?? 100) - (item.correctListening ?? 0));
+     const wrongReading = item.wrongReading ?? Math.max(0, (item.totalReading ?? 100) - (item.correctReading ?? 0));
+
      navigate("/taking-exam", {
         state: {
            examId: item.examId,
@@ -45,10 +59,10 @@ const ExamHistory = () => {
            isReviewMode: true,
            scoreInfo: {
               correctL: item.correctListening,
-              wrongL: 100 - item.correctListening, 
+              wrongL: wrongListening,
               scoreL: item.scoreListening,
               correctR: item.correctReading,
-              wrongR: 100 - item.correctReading,
+              wrongR: wrongReading,
               scoreR: item.scoreReading,
               totalScore: item.totalScore,
               timeSpent: item.timeSpent

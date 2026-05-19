@@ -30,25 +30,23 @@ const Vocab = () => {
 
   // Effect gọi Datamuse API khi đang gõ tiếng Anh
   useEffect(() => {
-    if (!english.trim()) {
-      setSuggestions([]);
-      setViSuggestion(""); // Xóa gợi ý tiếng Việt nếu ô tiếng Anh trống
-      return;
-    }
+    const trimmedEnglish = english.trim();
 
-    const fetchSuggestions = async () => {
+    const timeoutId = setTimeout(async () => {
+      if (!trimmedEnglish) {
+        setSuggestions([]);
+        setViSuggestion(""); // Xóa gợi ý tiếng Việt nếu ô tiếng Anh trống
+        return;
+      }
+
       try {
-        const response = await fetch(`https://api.datamuse.com/sug?s=${english}&max=5`);
+        const response = await fetch(`https://api.datamuse.com/sug?s=${trimmedEnglish}&max=5`);
         const data = await response.json();
         setSuggestions(data);
       } catch (error) {
         console.error("Lỗi khi tải gợi ý từ vựng:", error);
       }
-    };
-
-    const timeoutId = setTimeout(() => {
-      fetchSuggestions();
-    }, 300);
+    }, trimmedEnglish ? 300 : 0);
 
     return () => clearTimeout(timeoutId);
   }, [english]);

@@ -1,6 +1,6 @@
-import Navbar from "./components/Navbar/navbar";
-import Footer from "./components/Footer/footer";
-import Login from "./components/Login/login";
+import Navbar from "./components/Navbar/Navbar";
+import Footer from "./components/Footer/Footer";
+import Login from "./components/Login/Login";
 import { useState, useEffect } from "react";
 import { Route, Routes } from "react-router-dom";
 import "./App.css";
