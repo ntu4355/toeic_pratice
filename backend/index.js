@@ -160,7 +160,7 @@ async function processKeyPdf(filePath, keyName) {
 }
 
 // ==========================================
-// HÀM CHẠY NGẦM BÓC TÁCH ĐỀ THI
+// HÀM CHẠY NGẦM BÓC TÁCH ĐỀ THI (TẠO MỚI)
 // ==========================================
 async function processExamInBackground(pdfFiles, examName, duration, partsArray, cropFiles, zipFilePath, listeningKeyPath, readingKeyPath) {
     try {
@@ -246,6 +246,10 @@ async function processExamInBackground(pdfFiles, examName, duration, partsArray,
 
                 for (let j = 0; j < totalPages; j += pagesPerChunk) {
                     const endIndex = Math.min(j + pagesPerChunk, totalPages);
+                    
+                    // 💡 THÊM MỚI LOG TIẾN ĐỘ: Giúp bạn biết hệ thống đang chạy đến trang mấy
+                    console.log(`[Exam Parser] 🧠 Đang quét Đề thi (Trang ${j + 1} - ${endIndex} / Tổng ${totalPages} trang)...`);
+
                     const subDocument = await PDFDocument.create();
                     const indices = Array.from({length: endIndex - j}, (_, index) => j + index);
                     const copiedPages = await subDocument.copyPages(pdfDoc, indices);
@@ -287,43 +291,59 @@ async function processExamInBackground(pdfFiles, examName, duration, partsArray,
 
                             if (firstBrace !== -1 && lastBrace !== -1) {
                                 const parsedData = JSON.parse(rawText.substring(firstBrace, lastBrace + 1));
-                                if (parsedData.questions && parsedData.questions.length > 0) {
-                                    
-                                    const processedQuestions = parsedData.questions.map(q => {
-                                        let pImages = [];
-                                        for (const taskId in taskImageMap) {
-                                            if (taskId.startsWith('part6_') || taskId.startsWith('part7_')) {
+                                
+                                // 💡 SỬA LỖI LOGIC: Chỉ cần AI trả về mảng hợp lệ (kể cả 0 câu) là cho qua luôn, không ép loop lại
+                                if (parsedData.questions && Array.isArray(parsedData.questions)) {
+                                    if (parsedData.questions.length > 0) {
+                                        const processedQuestions = parsedData.questions.map(q => {
+                                            let pImages = [];
+                                            let graphicUrl = ""; 
+
+                                            for (const taskId in taskImageMap) {
                                                 const parts = taskId.split('_'); 
-                                                const start = parseInt(parts[1], 10);
-                                                const end = parseInt(parts[2], 10);
-                                                if (q.QuestionNo >= start && q.QuestionNo <= end) {
-                                                    pImages = taskImageMap[taskId];
-                                                    break; 
+                                                if (parts.length === 3) {
+                                                    const start = parseInt(parts[1], 10);
+                                                    const end = parseInt(parts[2], 10);
+                                                    if (q.QuestionNo >= start && q.QuestionNo <= end) {
+                                                        if (taskId.startsWith('part6_') || taskId.startsWith('part7_')) {
+                                                            pImages = taskImageMap[taskId];
+                                                        }
+                                                        if (taskId.startsWith('part3_') || taskId.startsWith('part4_')) {
+                                                            graphicUrl = taskImageMap[taskId][0] || "";
+                                                        }
+                                                        break; 
+                                                    }
                                                 }
                                             }
-                                        }
 
-                                        return {
-                                            ...q,
-                                            AudioUrl: audioUrlMap[q.QuestionNo] || "",
-                                            PassageImages: pImages,
-                                            CorrectAnswer: allKeys[q.QuestionNo]?.CorrectAnswer || "", 
-                                            Explanation: allKeys[q.QuestionNo]?.Explanation || ""      
-                                        };
-                                    });
+                                            return {
+                                                ...q,
+                                                AudioUrl: audioUrlMap[q.QuestionNo] || "",
+                                                PassageImages: pImages,
+                                                ImageUrl: graphicUrl || "", 
+                                                CorrectAnswer: allKeys[q.QuestionNo]?.CorrectAnswer || "", 
+                                                Explanation: allKeys[q.QuestionNo]?.Explanation || ""      
+                                            };
+                                        });
 
-                                    finalQuestionsArray = [...finalQuestionsArray, ...processedQuestions];
+                                        finalQuestionsArray = [...finalQuestionsArray, ...processedQuestions];
+                                    }
                                     chunkSuccess = true; 
+                                    console.log(`[Exam Parser] [V] Đã đọc xong Trang ${j+1}-${endIndex}. Ghi nhận thêm ${parsedData.questions.length} câu mới.`);
                                 }
                             }
                         } catch (error) {
+                            console.error(`[Exam Parser] ❌ Lỗi quét nội dung (Lần thử ${attempt}):`, error.message);
                             if (attempt < 3) await sleep(60000);
                         } finally {
                             if (uploadResponse) try { await fileManager.deleteFile(uploadResponse.file.name); } catch(e){}
                         }
                     } 
                     try { fs.unlinkSync(tempPdfPath); } catch(e){}
-                    if (j + pagesPerChunk < totalPages || i < pdfFiles.length - 1) await sleep(60000);
+                    if (j + pagesPerChunk < totalPages || i < pdfFiles.length - 1) {
+                        console.log(`[Exam Parser] ⏳ Nghỉ 60 giây chống sập nghẽn Token...`);
+                        await sleep(60000);
+                    }
                 }
                 try { fs.unlinkSync(pdfFile.path); } catch(e){}
             }
@@ -413,18 +433,15 @@ app.put('/api/exams/:id/append-files', upload.any(), async (req, res) => {
                 let allKeys = {};
                 let taskImageMap = {}; 
 
-                // 🧠 Dò xem đề này đã có sẵn những câu hỏi nào để cắt tỉa
                 const existingQuestionNumbers = updatedQuestions.map(q => q.QuestionNo);
                 const existingQsText = existingQuestionNumbers.length > 0 ? existingQuestionNumbers.join(', ') : "Chưa có câu nào";
 
-                // Phân loại file tải lên
                 const examPdfFiles = files.filter(f => f.fieldname === 'examFiles' && f.mimetype === 'application/pdf');
                 const listeningKeyFile = files.find(f => f.fieldname === 'listeningKey');
                 const readingKeyFile = files.find(f => f.fieldname === 'readingKey');
                 const zipFile = files.find(f => f.fieldname === 'audioZip' || f.originalname.toLowerCase().endsWith('.zip'));
                 const cropFiles = files.filter(f => f.mimetype.startsWith('image/')); 
 
-                // 1. UPLOAD ẢNH SCAN BỔ SUNG LÊN CLOUDINARY
                 if (cropFiles && cropFiles.length > 0) {
                     console.log(`\n[+] Đang đẩy ${cropFiles.length} bức ảnh scan bổ sung lên Cloudinary...`);
                     for (const file of cropFiles) {
@@ -438,7 +455,6 @@ app.put('/api/exams/:id/append-files', upload.any(), async (req, res) => {
                     }
                 }
 
-                // 2. ĐỌC NHIỀU FILE ĐỀ THI BỔ SUNG (NẾU CÓ)
                 if (examPdfFiles && examPdfFiles.length > 0) {
                     console.log(`\n[+] Bắt đầu quét nội dung ${examPdfFiles.length} File ĐỀ THI bổ sung...`);
                     for (let i = 0; i < examPdfFiles.length; i++) {
@@ -450,6 +466,8 @@ app.put('/api/exams/:id/append-files', upload.any(), async (req, res) => {
 
                         for (let j = 0; j < totalPages; j += pagesPerChunk) {
                             const endIndex = Math.min(j + pagesPerChunk, totalPages);
+                            console.log(`[Worker Update] 🧠 Đang quét bổ sung (Trang ${j + 1} - ${endIndex} / Tổng ${totalPages} trang)...`);
+
                             const subDocument = await PDFDocument.create();
                             const indices = Array.from({length: endIndex - j}, (_, index) => j + index);
                             const copiedPages = await subDocument.copyPages(pdfDoc, indices);
@@ -493,51 +511,42 @@ app.put('/api/exams/:id/append-files', upload.any(), async (req, res) => {
 
                                     if (firstBrace !== -1 && lastBrace !== -1) {
                                         const parsedData = JSON.parse(rawText.substring(firstBrace, lastBrace + 1));
-                                        if (parsedData.questions && parsedData.questions.length > 0) {
-                                            parsedData.questions.forEach(newQ => {
-                                                
-                                                // Gắn ảnh Scan vào câu hỏi (nếu có trùng mã)
-                                                let pImages = [];
-                                                for (const taskId in taskImageMap) {
-                                                    if (taskId.startsWith('part6_') || taskId.startsWith('part7_')) {
-                                                        const parts = taskId.split('_'); 
-                                                        const start = parseInt(parts[1], 10);
-                                                        const end = parseInt(parts[2], 10);
-                                                        if (newQ.QuestionNo >= start && newQ.QuestionNo <= end) {
-                                                            pImages = taskImageMap[taskId];
-                                                            break; 
-                                                        }
+                                        
+                                        // 💡 ĐỒNG BỘ SỬA LỖI LOGIC TẠI ĐÂY CHO ĐƯỜNG UPDATE
+                                        if (parsedData.questions && Array.isArray(parsedData.questions)) {
+                                            if (parsedData.questions.length > 0) {
+                                                parsedData.questions.forEach(newQ => {
+                                                    const existingQIndex = updatedQuestions.findIndex(q => q.QuestionNo === newQ.QuestionNo);
+                                                    if (existingQIndex !== -1) {
+                                                        updatedQuestions[existingQIndex] = { ...updatedQuestions[existingQIndex], ...newQ };
+                                                    } else {
+                                                        updatedQuestions.push({
+                                                            ...newQ, AudioUrl: "", PassageImages: [], ImageUrl: "", CorrectAnswer: "", Explanation: ""
+                                                        });
                                                     }
-                                                }
-
-                                                const existingQIndex = updatedQuestions.findIndex(q => q.QuestionNo === newQ.QuestionNo);
-                                                if (existingQIndex !== -1) {
-                                                    updatedQuestions[existingQIndex] = { ...updatedQuestions[existingQIndex], ...newQ, PassageImages: pImages.length > 0 ? pImages : updatedQuestions[existingQIndex].PassageImages };
-                                                } else {
-                                                    updatedQuestions.push({
-                                                        ...newQ, AudioUrl: "", PassageImages: pImages, CorrectAnswer: "", Explanation: ""
-                                                    });
-                                                }
-                                            });
+                                                });
+                                            }
                                             chunkSuccess = true;
-                                        } else {
-                                            chunkSuccess = true; // Trả về mảng rỗng do AI bỏ qua câu trùng
+                                            console.log(`[Worker Update] [V] Đã xử lý xong Trang ${j+1}-${endIndex}. Nhận thêm ${parsedData.questions.length} câu.`);
                                         }
                                     }
                                 } catch (error) {
+                                    console.error(`[Worker Update] ❌ Lỗi quét bổ sung (Lần thử ${attempt}):`, error.message);
                                     if (attempt < 3) await sleep(60000);
                                 } finally {
                                     if (uploadResponse) try { await fileManager.deleteFile(uploadResponse.file.name); } catch(e){}
                                 }
                             }
                             try { fs.unlinkSync(tempPdfPath); } catch(e){}
-                            if (j + pagesPerChunk < totalPages || i < examPdfFiles.length - 1) await sleep(60000);
+                            if (j + pagesPerChunk < totalPages || i < examPdfFiles.length - 1) {
+                                console.log(`[Worker Update] ⏳ Nghỉ 60 giây chống sập nghẽn Token...`);
+                                await sleep(60000);
+                            }
                         }
                         try { fs.unlinkSync(examPdfFile.path); } catch(e){} 
                     }
                 }
 
-                // 3. ĐỌC FILE ĐÁP ÁN (NẾU CÓ)
                 if (listeningKeyFile) {
                     const keys = await processKeyPdf(listeningKeyFile.path, "Listening (Bổ sung)");
                     allKeys = { ...allKeys, ...keys };
@@ -547,7 +556,6 @@ app.put('/api/exams/:id/append-files', upload.any(), async (req, res) => {
                     allKeys = { ...allKeys, ...keys };
                 }
 
-                // Gộp đáp án vào mảng câu hỏi
                 if (Object.keys(allKeys).length > 0) {
                     updatedQuestions = updatedQuestions.map(q => {
                         if (allKeys[q.QuestionNo]) {
@@ -561,7 +569,6 @@ app.put('/api/exams/:id/append-files', upload.any(), async (req, res) => {
                     });
                 }
 
-                // 4. GIẢI NÉN AUDIO (NẾU CÓ)
                 if (zipFile && fs.existsSync(zipFile.path)) {
                     console.log(`\n[+] Đang giải nén và up Audio bổ sung...`);
                     const extractedPath = path.join(process.cwd(), `uploads/audio_update_${Date.now()}`);
@@ -595,7 +602,6 @@ app.put('/api/exams/:id/append-files', upload.any(), async (req, res) => {
                     });
                 }
 
-                // 5. TỰ ĐỘNG TẠO CÂU PART 1 VÀ 2 NẾU TRƯỚC ĐÓ CHƯA CÓ NHƯNG NAY LẠI UP ĐÁP ÁN/AUDIO
                 for (let k = 1; k <= 31; k++) {
                     if (!updatedQuestions.find(q => q.QuestionNo === k)) {
                         if (allKeys[k] || taskImageMap[`part1_image_${k}`]) {
@@ -605,7 +611,7 @@ app.put('/api/exams/:id/append-files', upload.any(), async (req, res) => {
                                 QuestionText: isPart1 ? "(Nghe Audio và chọn đáp án mô tả đúng nhất bức tranh)" : "(Nghe Audio và chọn câu phản hồi đúng nhất)",
                                 OptionA: "A", OptionB: "B", OptionC: "C", OptionD: isPart1 ? "D" : "",
                                 ImageUrl: isPart1 && taskImageMap[`part1_image_${k}`] ? taskImageMap[`part1_image_${k}`][0] : "",
-                                AudioUrl: "", // Sẽ được map lại ở bước AudioZip nếu có
+                                AudioUrl: "", 
                                 CorrectAnswer: allKeys[k]?.CorrectAnswer || "",
                                 Explanation: allKeys[k]?.Explanation || ""
                             });
@@ -613,10 +619,30 @@ app.put('/api/exams/:id/append-files', upload.any(), async (req, res) => {
                     }
                 }
 
-                // 🌟 BƯỚC QUAN TRỌNG: SẮP XẾP LẠI TỪ 1 ĐẾN 200
+                updatedQuestions = updatedQuestions.map(q => {
+                    let pImages = q.PassageImages || [];
+                    let graphicUrl = q.ImageUrl || "";
+                    
+                    for (const taskId in taskImageMap) {
+                        const parts = taskId.split('_'); 
+                        if (parts.length === 3) {
+                            const start = parseInt(parts[1], 10);
+                            const end = parseInt(parts[2], 10);
+                            if (q.QuestionNo >= start && q.QuestionNo <= end) {
+                                if (taskId.startsWith('part6_') || taskId.startsWith('part7_')) {
+                                    pImages = taskImageMap[taskId];
+                                }
+                                if (taskId.startsWith('part3_') || taskId.startsWith('part4_')) {
+                                    graphicUrl = taskImageMap[taskId][0] || "";
+                                }
+                            }
+                        }
+                    }
+                    return { ...q, PassageImages: pImages, ImageUrl: graphicUrl };
+                });
+
                 updatedQuestions.sort((a, b) => a.QuestionNo - b.QuestionNo);
 
-                // LƯU TOÀN BỘ BẢN CẬP NHẬT VÀO DATABASE
                 exam.questions = updatedQuestions;
                 await exam.save();
                 console.log(`[Worker Update] 🎉 Đã gộp và sắp xếp thành công! Tổng số câu hiện tại: ${updatedQuestions.length}`);
@@ -631,10 +657,9 @@ app.put('/api/exams/:id/append-files', upload.any(), async (req, res) => {
     }
 });
 
-
-// ===================================================
-// NÂNG CẤP: LƯU TRƯỜNG "userAnswers" ĐỂ XEM LẠI ĐÁP ÁN ĐÃ CHỌN
-// ===================================================
+// ==========================================
+// KẾT QUẢ THI (GIỮ NGUYÊN)
+// ==========================================
 const resultSchema = new mongoose.Schema({
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     examId: { type: mongoose.Schema.Types.ObjectId, ref: 'Exam' },
@@ -645,7 +670,7 @@ const resultSchema = new mongoose.Schema({
     scoreReading: Number,
     totalScore: Number,
     timeSpent: Number,
-    userAnswers: Object, // 💡 MỚI: Két sắt lưu chính xác mảng câu trả lời chi tiết [1: "A", 2: "C"]
+    userAnswers: Object, 
     createdAt: { type: Date, default: Date.now }
 });
 const Result = mongoose.model('Result', resultSchema);
@@ -668,7 +693,6 @@ app.get('/api/results/user/:userId', async (req, res) => {
         res.status(500).json({ message: "Lỗi lấy lịch sử" }); 
     }
 });
-
 
 // ==========================================
 // CÁC API AUTH VÀ USER CŨ (GIỮ NGUYÊN)

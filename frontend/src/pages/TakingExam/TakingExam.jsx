@@ -29,8 +29,6 @@ const TakingExam = () => {
   
   const examId = location.state?.examId;
   const isReviewMode = location.state?.isReviewMode || false;
-  
-  // 💡 MỚI: Nếu xem lại bài, ép selectedParts = [] để mở khóa hiển thị toàn bộ 7 Part cho User xem đáp án
   const selectedParts = isReviewMode ? [] : (location.state?.selectedParts || []); 
 
   const [examInfo, setExamInfo] = useState(null);
@@ -41,14 +39,12 @@ const TakingExam = () => {
 
   const [isSubmitted, setIsSubmitted] = useState(isReviewMode);
   
-  // 💡 MỚI: Lấy trực tiếp điểm thật truyền từ ExamHistory sang (nếu có), không để máy tự chấm lại
   const [scoreInfo, setScoreInfo] = useState(location.state?.scoreInfo || { 
     correctL: 0, wrongL: 0, scoreL: 0,
     correctR: 0, wrongR: 0, scoreR: 0,
     totalScore: 0, timeSpent: 0 
   });
 
-  // TẢI ĐỀ THI TỪ MONGODB
   useEffect(() => {
     if (!examId) {
       alert("Không tìm thấy thông tin đề thi!");
@@ -89,11 +85,8 @@ const TakingExam = () => {
         }
       })
       .catch((err) => console.error("Lỗi khi tải đề thi:", err));
-      
-      // 💡 ĐÃ FIX BỆNH SỐ 2: Xóa selectedParts khỏi mảng bên dưới để nó không trigger load lại màn hình nữa
   }, [examId, navigate]); 
 
-  // QUẢN LÝ BỘ ĐẾM THỜI GIAN
   useEffect(() => {
     if (isReviewMode) return; 
     if (timeLeft <= 0 && !isSubmitted) {
@@ -116,7 +109,6 @@ const TakingExam = () => {
     setAnswers((prev) => ({ ...prev, [questionNo]: optionLetter }));
   };
 
-  // TÍNH ĐIỂM (CHỈ CHẠY KHI ĐANG LÀM BÀI MỚI VÀ BẤM NỘP)
   const calculateScore = async () => {
     let correctL = 0, wrongL = 0, correctR = 0, wrongR = 0;
     let totalL = 0, totalR = 0;
@@ -242,48 +234,54 @@ const TakingExam = () => {
       
       <div className="exam-content-col">
         {isSubmitted && (
-          <div style={{ background: '#fff', borderRadius: '12px', padding: '30px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', marginBottom: '30px', borderTop: '5px solid #2563eb' }}>
-            <h2 style={{ textAlign: 'center', color: '#1e3a8a', marginBottom: '25px', fontSize: '24px' }}>
-               {isReviewMode ? "🔍 XEM LẠI BÀI THI CŨ" : "🎉 KẾT QUẢ BÀI THI"}
+          <div className="result-dashboard-card">
+            <h2 style={{ textAlign: 'center', color: '#1e3a8a', marginBottom: '30px', fontSize: '26px', fontWeight: '800', letterSpacing: '-0.5px' }}>
+               {isReviewMode ? "🔍 CHI TIẾT BÀI LÀM CŨ" : "🎉 KẾT QUẢ KIỂM TRA"}
             </h2>
             
-            <div style={{ display: 'flex', gap: '30px', flexWrap: 'wrap', justifyContent: 'center' }}>
-              
-              <div style={{ flex: '1', minWidth: '250px', background: '#f8fafc', padding: '20px', borderRadius: '12px', textAlign: 'center', border: '1px solid #e2e8f0' }}>
-                <div style={{ fontSize: '16px', color: '#64748b', fontWeight: 'bold' }}>TỔNG ĐIỂM</div>
-                <div style={{ fontSize: '48px', color: '#2563eb', fontWeight: '900', margin: '10px 0' }}>{scoreInfo.totalScore}</div>
-                <div style={{ fontSize: '14px', color: '#94a3b8' }}>/ 990</div>
-                
-                <hr style={{ margin: '20px 0', borderColor: '#e2e8f0' }}/>
-                
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#475569' }}>
-                  <span>⏱ Thời gian làm bài:</span>
-                  <strong>{Math.floor(scoreInfo.timeSpent / 60)} phút {scoreInfo.timeSpent % 60} giây</strong>
+            <div style={{ display: 'flex', gap: '25px', flexWrap: 'wrap', justifyContent: 'center' }}>
+              <div className="score-summary-box">
+                <div style={{ fontSize: '14px', color: '#64748b', fontWeight: '700', letterSpacing: '1px' }}>TỔNG ĐIỂM</div>
+                <div className="total-score-value">{scoreInfo.totalScore}</div>
+                <div style={{ fontSize: '15px', color: '#94a3b8', fontWeight: '600' }}>/ 990 Điểm</div>
+                <div style={{ width: '100%', height: '1px', background: '#e2e8f0', margin: '20px 0' }}></div>
+                <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '14px', color: '#475569' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>⏱ Thời gian:</span>
+                    <strong style={{ color: '#1e293b' }}>{Math.floor(scoreInfo.timeSpent / 60)} phút {scoreInfo.timeSpent % 60} giây</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>🎯 Tỷ lệ chính xác:</span>
+                    <strong style={{ color: '#4f46e5' }}>{Math.round(((scoreInfo.correctL + scoreInfo.correctR) / questions.length) * 100)}%</strong>
+                  </div>
                 </div>
               </div>
 
-              <div style={{ flex: '2', minWidth: '350px', display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                <div style={{ background: '#eff6ff', padding: '15px 20px', borderRadius: '10px', borderLeft: '5px solid #3b82f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ flex: '2', minWidth: '340px', display: 'flex', flexDirection: 'column', gap: '16px', justifyContent: 'center' }}>
+                <div className="section-score-card card-listening">
                   <div>
-                    <h4 style={{ color: '#1e40af', margin: '0 0 5px 0' }}>🎧 Listening</h4>
-                    <div style={{ fontSize: '13px', color: '#64748b' }}>
-                      <span style={{ color: '#16a34a', fontWeight: 'bold' }}>{scoreInfo.correctL} đúng</span> | <span style={{ color: '#ef4444', fontWeight: 'bold' }}>{scoreInfo.wrongL} sai/bỏ qua</span>
+                    <h4 style={{ color: '#1e40af', margin: '0 0 6px 0', fontSize: '17px', fontWeight: '700' }}>🎧 Phần thi Listening</h4>
+                    <div style={{ fontSize: '13.5px', color: '#4b5563' }}>
+                      <span style={{ color: '#15803d', fontWeight: '700' }}>{scoreInfo.correctL} câu đúng</span>
+                      <span style={{ color: '#9ca3af', margin: '0 8px' }}>|</span>
+                      <span style={{ color: '#b91c1c', fontWeight: '700' }}>{scoreInfo.wrongL} câu sai</span>
                     </div>
                   </div>
-                  <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#1d4ed8' }}>{scoreInfo.scoreL} <span style={{fontSize: '14px', color: '#94a3b8'}}>/ 495</span></div>
+                  <div style={{ fontSize: '32px', fontWeight: '900', color: '#1d4ed8' }}>{scoreInfo.scoreL}</div>
                 </div>
 
-                <div style={{ background: '#f0fdf4', padding: '15px 20px', borderRadius: '10px', borderLeft: '5px solid #22c55e', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div className="section-score-card card-reading">
                   <div>
-                    <h4 style={{ color: '#166534', margin: '0 0 5px 0' }}>📖 Reading</h4>
-                    <div style={{ fontSize: '13px', color: '#64748b' }}>
-                      <span style={{ color: '#16a34a', fontWeight: 'bold' }}>{scoreInfo.correctR} đúng</span> | <span style={{ color: '#ef4444', fontWeight: 'bold' }}>{scoreInfo.wrongR} sai/bỏ qua</span>
+                    <h4 style={{ color: '#166534', margin: '0 0 6px 0', fontSize: '17px', fontWeight: '700' }}>📖 Phần thi Reading</h4>
+                    <div style={{ fontSize: '13.5px', color: '#4b5563' }}>
+                      <span style={{ color: '#15803d', fontWeight: '700' }}>{scoreInfo.correctR} câu đúng</span>
+                      <span style={{ color: '#9ca3af', margin: '0 8px' }}>|</span>
+                      <span style={{ color: '#b91c1c', fontWeight: '700' }}>{scoreInfo.wrongR} câu sai</span>
                     </div>
                   </div>
-                  <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#15803d' }}>{scoreInfo.scoreR} <span style={{fontSize: '14px', color: '#94a3b8'}}>/ 495</span></div>
+                  <div style={{ fontSize: '32px', fontWeight: '900', color: '#15803d' }}>{scoreInfo.scoreR}</div>
                 </div>
               </div>
-
             </div>
           </div>
         )}
@@ -367,6 +365,9 @@ const TakingExam = () => {
           <div className="questions-list">
             {displayedQuestions.map((q, index) => {
               const showAudioPlayer = q.AudioUrl && (index === 0 || q.AudioUrl !== displayedQuestions[index - 1].AudioUrl);
+              
+              // 💡 ĐÃ TỐI ƯU UX: Sơ đồ đồ họa chia sẻ chung cho 3 câu Part 3/4 sẽ CHỈ HIỆN 1 LẦN, tránh lặp lại 3 tấm ảnh giống nhau
+              const showGraphicImage = q.ImageUrl && (index === 0 || q.ImageUrl !== displayedQuestions[index - 1].ImageUrl);
 
               return (
                 <div key={q.QuestionNo} id={`question-${q.QuestionNo}`} className="question-item">
@@ -376,9 +377,12 @@ const TakingExam = () => {
                      </div>
                   )}
 
+                  {/* 🖼 HIỂN THỊ ĐỒ HỌA PART 3/4 KHÔNG LẶP LẠI */}
+                  {showGraphicImage && (
+                     <img src={q.ImageUrl} alt={`Sơ đồ đồ họa`} style={{maxWidth: "100%", maxHeight: "480px", display: 'block', margin: "10px 0 20px 0", borderRadius: "10px", boxShadow: '0 4px 15px rgba(0,0,0,0.06)', border: '1px solid #e2e8f0'}} />
+                  )}
+
                   <p className="question-text"><strong>Câu {q.QuestionNo}:</strong> {q.QuestionText}</p>
-                  
-                  {q.ImageUrl && <img src={q.ImageUrl} alt={`Question ${q.QuestionNo}`} style={{maxWidth: "100%", maxHeight: "500px", marginBottom: "15px", borderRadius: "8px"}} />}
                   
                   <div className="options-group">
                     {["A", "B", "C", "D"].map((opt) => {
