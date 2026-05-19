@@ -14,14 +14,14 @@ const partsConfig = [
 ];
 
 const getListeningScore = (correct) => {
-    if (correct <= 6) return 5;
-    if (correct >= 93) return 495;
-    return Math.round((correct * 5.3) / 5) * 5; 
+  if (correct <= 0) return 0;
+  if (correct >= 93) return 495;
+  return Math.round((correct * 5.3) / 5) * 5;
 };
 const getReadingScore = (correct) => {
-    if (correct <= 9) return 5;
-    if (correct >= 97) return 495;
-    return Math.round((correct * 5.1) / 5) * 5; 
+  if (correct <= 0) return 0;
+  if (correct >= 97) return 495;
+  return Math.round((correct * 5.1) / 5) * 5;
 };
 
 const optionLabelRegex = /^\([A-D]\)$/;
@@ -49,13 +49,13 @@ const ExplanationContent = ({ text }) => {
 const TakingExam = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  
+
   const examId = location.state?.examId;
   const isReviewMode = location.state?.isReviewMode || false;
   const selectedParts = useMemo(
     () => (isReviewMode ? [] : location.state?.selectedParts || []),
     [isReviewMode, location.state],
-  ); 
+  );
 
   const [examInfo, setExamInfo] = useState(null);
   const [questions, setQuestions] = useState([]);
@@ -64,11 +64,11 @@ const TakingExam = () => {
   const [activePartId, setActivePartId] = useState(null);
 
   const [isSubmitted, setIsSubmitted] = useState(isReviewMode);
-  
-  const [scoreInfo, setScoreInfo] = useState(location.state?.scoreInfo || { 
+
+  const [scoreInfo, setScoreInfo] = useState(location.state?.scoreInfo || {
     correctL: 0, wrongL: 0, scoreL: 0,
     correctR: 0, wrongR: 0, scoreR: 0,
-    totalScore: 0, timeSpent: 0 
+    totalScore: 0, timeSpent: 0
   });
 
   const calculateScore = useCallback(async () => {
@@ -76,7 +76,7 @@ const TakingExam = () => {
 
     let correctL = 0, wrongL = 0, correctR = 0, wrongR = 0;
     let totalL = 0, totalR = 0;
-    
+
     questions.forEach(q => {
       const userAns = answers[q.QuestionNo]?.trim().toUpperCase();
       const correctAns = q.CorrectAnswer?.trim().toUpperCase();
@@ -91,7 +91,7 @@ const TakingExam = () => {
           isListening ? wrongL++ : wrongR++;
         }
       } else {
-          isListening ? wrongL++ : wrongR++;
+        isListening ? wrongL++ : wrongR++;
       }
     });
 
@@ -101,7 +101,7 @@ const TakingExam = () => {
     const scoreL = totalL > 0 ? getListeningScore(projectedCorrectL) : 0;
     const scoreR = totalR > 0 ? getReadingScore(projectedCorrectR) : 0;
     const totalScore = scoreL + scoreR;
-    const timeSpent = ((examInfo.duration || 120) * 60) - timeLeft; 
+    const timeSpent = ((examInfo.duration || 120) * 60) - timeLeft;
 
     const finalScoreInfo = {
       correctL,
@@ -123,28 +123,28 @@ const TakingExam = () => {
     const userId = user.id || user._id;
 
     if (userId) {
-        try {
-            await fetch(`${API_BASE_URL}/api/results`, {
-                method: 'POST',
-                headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
-                body: JSON.stringify({
-                    userId: userId,
-                    examId: examInfo._id || examInfo.id,
-                    examName: examInfo.name,
-                    correctListening: correctL,
-                    wrongListening: wrongL,
-                    totalListening: totalL,
-                    correctReading: correctR,
-                    wrongReading: wrongR,
-                    totalReading: totalR,
-                    scoreListening: scoreL,
-                    scoreReading: scoreR,
-                    totalScore: totalScore,
-                    timeSpent: timeSpent,
-                    userAnswers: answers 
-                })
-            });
-        } catch (err) { console.error("Lỗi lưu lịch sử", err); }
+      try {
+        await fetch(`${API_BASE_URL}/api/results`, {
+          method: 'POST',
+          headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({
+            userId: userId,
+            examId: examInfo._id || examInfo.id,
+            examName: examInfo.name,
+            correctListening: correctL,
+            wrongListening: wrongL,
+            totalListening: totalL,
+            correctReading: correctR,
+            wrongReading: wrongR,
+            totalReading: totalR,
+            scoreListening: scoreL,
+            scoreReading: scoreR,
+            totalScore: totalScore,
+            timeSpent: timeSpent,
+            userAnswers: answers
+          })
+        });
+      } catch (err) { console.error("Lỗi lưu lịch sử", err); }
     }
   }, [answers, examInfo, questions, timeLeft]);
 
@@ -164,25 +164,25 @@ const TakingExam = () => {
       .then((res) => res.json())
       .then((data) => {
         const currentExam = data.find((e) => String(e._id) === String(examId) || String(e.id) === String(examId));
-        
+
         if (currentExam) {
           setExamInfo(currentExam);
           setTimeLeft(currentExam.duration ? currentExam.duration * 60 : 7200);
-          
+
           let examQuestions = currentExam.questions || [];
-          
+
           if (selectedParts && selectedParts.length > 0) {
-             examQuestions = examQuestions.filter(q => {
-               const matchedPart = partsConfig.find(p => q.QuestionNo >= p.start && q.QuestionNo <= p.end);
-               return matchedPart && selectedParts.includes(matchedPart.id);
-             });
+            examQuestions = examQuestions.filter(q => {
+              const matchedPart = partsConfig.find(p => q.QuestionNo >= p.start && q.QuestionNo <= p.end);
+              return matchedPart && selectedParts.includes(matchedPart.id);
+            });
           }
 
           examQuestions.sort((a, b) => a.QuestionNo - b.QuestionNo);
 
           if (examQuestions.length > 0) {
             setQuestions(examQuestions);
-            const firstAvailablePart = partsConfig.find(p => 
+            const firstAvailablePart = partsConfig.find(p =>
               (selectedParts.length === 0 || selectedParts.includes(p.id)) &&
               examQuestions.some(q => q.QuestionNo >= p.start && q.QuestionNo <= p.end)
             );
@@ -193,16 +193,16 @@ const TakingExam = () => {
         }
       })
       .catch((err) => console.error("Lỗi khi tải đề thi:", err));
-  }, [examId, navigate, selectedParts]); 
+  }, [examId, navigate, selectedParts]);
 
   useEffect(() => {
-    if (isReviewMode) return; 
+    if (isReviewMode) return;
     if (timeLeft <= 0 && !isSubmitted) {
       const submitTimer = window.setTimeout(handleAutoSubmit, 0);
       return () => window.clearTimeout(submitTimer);
     }
-    if (isSubmitted) return; 
-    
+    if (isSubmitted) return;
+
     const timer = setInterval(() => setTimeLeft((prev) => prev - 1), 1000);
     return () => clearInterval(timer);
   }, [timeLeft, isSubmitted, isReviewMode, handleAutoSubmit]);
@@ -214,14 +214,14 @@ const TakingExam = () => {
   };
 
   const handleSelectAnswer = (questionNo, optionLetter) => {
-    if (isSubmitted || isReviewMode) return; 
+    if (isSubmitted || isReviewMode) return;
     setAnswers((prev) => ({ ...prev, [questionNo]: optionLetter }));
   };
 
   const handleManualSubmit = () => {
     if (isSubmitted || isReviewMode) {
-       navigate("/history"); 
-       return;
+      navigate("/history");
+      return;
     }
     if (window.confirm("Bạn có chắc chắn muốn nộp bài ngay bây giờ?")) {
       void calculateScore();
@@ -245,7 +245,7 @@ const TakingExam = () => {
     return <div style={{ textAlign: "center", padding: "50px" }}>Đang tải dữ liệu bài thi...</div>;
   }
 
-  const availableParts = partsConfig.filter(p => 
+  const availableParts = partsConfig.filter(p =>
     (selectedParts.length === 0 || selectedParts.includes(p.id)) &&
     questions.some(q => q.QuestionNo >= p.start && q.QuestionNo <= p.end)
   );
@@ -275,28 +275,28 @@ const TakingExam = () => {
 
   return (
     <div className="taking-exam-container">
-      
+
       <div className="exam-content-col">
         {/* ================= GIAO DIỆN KẾT QUẢ KIỂM TRA ĐÃ ĐƯỢC TỐI ƯU HÓA HOÀN HẢO ================= */}
         {isSubmitted && (
           <div className="result-dashboard-card">
             <h2 style={{ textAlign: 'center', color: '#1e3a8a', margin: '0 0 5px 0', fontSize: '24px', fontWeight: '800', letterSpacing: '-0.5px' }}>
-               {isReviewMode ? "🔍 CHI TIẾT BÀI LÀM CŨ" : "🎉 KẾT QUẢ KIỂM TRA"}
+              {isReviewMode ? "🔍 CHI TIẾT BÀI LÀM CŨ" : "🎉 KẾT QUẢ KIỂM TRA"}
             </h2>
             <p style={{ textAlign: 'center', color: '#64748b', fontSize: '14px', margin: '0 0 25px 0' }}>
               Hệ thống tự động chấm điểm và quy đổi TOEIC theo công thức ước lượng trong bản test
             </p>
-            
+
             <div className="result-dashboard-grid">
-              
+
               {/* CỘT ĐIỂM TỔNG SỐ BÊN TRÁI */}
               <div className="score-summary-box">
                 <div className="total-label">TỔNG ĐIỂM</div>
                 <div className="total-score-value">{scoreInfo.totalScore}</div>
                 <div className="total-max">/ 990 Điểm</div>
-                
+
                 <div style={{ width: '100%', height: '1px', background: '#e2e8f0', margin: '18px 0' }}></div>
-                
+
                 <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13.5px', color: '#475569' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span>⏱ Thời gian làm:</span>
@@ -311,7 +311,7 @@ const TakingExam = () => {
 
               {/* CỘT THỐNG KÊ CHI TIẾT THEO KỸ NĂNG BÊN PHẢI */}
               <div className="section-score-container">
-                
+
                 {/* THẺ ĐIỂM LISTENING */}
                 <div className="section-score-card card-listening">
                   <div>
@@ -344,7 +344,7 @@ const TakingExam = () => {
 
               </div>
             </div>
-            
+
             <div style={{ textAlign: 'center', marginTop: '25px', fontSize: '13.5px', color: '#475569', background: '#f8fafc', padding: '12px', borderRadius: '10px', border: '1px solid #e2e8f0', fontStyle: 'italic' }}>
               💡 Cuộn xuống dưới hoặc dùng bảng câu hỏi bên phải để nhảy nhanh đến câu muốn xem lời giải thích chi tiết nhé!
             </div>
@@ -366,25 +366,25 @@ const TakingExam = () => {
             {passageGroups.map((group, idx) => (
               <div key={idx} className="reading-split-container">
                 <div className="passage-left-col">
-                   <div className="passage-title">Câu hỏi {group.questions[0]?.QuestionNo} - {group.questions[group.questions.length - 1]?.QuestionNo} tham khảo thông tin sau:</div>
-                   <div className="passage-images-gallery">
-                     {group.images && group.images.length > 0 ? (
-                       group.images.map((imgUrl, imgIdx) => <img key={imgIdx} src={imgUrl} alt={`Đoạn văn`} style={{maxWidth: '100%'}} />)
-                     ) : (
-                       <div style={{ padding: '20px', background: '#fef2f2', color: '#991b1b', borderRadius: '8px', border: '1px dashed #fca5a5' }}>(Không tìm thấy dữ liệu ảnh bài đọc)</div>
-                     )}
-                   </div>
+                  <div className="passage-title">Câu hỏi {group.questions[0]?.QuestionNo} - {group.questions[group.questions.length - 1]?.QuestionNo} tham khảo thông tin sau:</div>
+                  <div className="passage-images-gallery">
+                    {group.images && group.images.length > 0 ? (
+                      group.images.map((imgUrl, imgIdx) => <img key={imgIdx} src={imgUrl} alt={`Đoạn văn`} style={{ maxWidth: '100%' }} />)
+                    ) : (
+                      <div style={{ padding: '20px', background: '#fef2f2', color: '#991b1b', borderRadius: '8px', border: '1px dashed #fca5a5' }}>(Không tìm thấy dữ liệu ảnh bài đọc)</div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="questions-right-col">
                   {group.questions.map((q) => (
                     <div key={q.QuestionNo} id={`question-${q.QuestionNo}`} className="question-item">
                       <p className="question-text"><strong>{q.QuestionNo}</strong>. {q.QuestionText}</p>
-                      
+
                       <div className="options-group">
                         {["A", "B", "C", "D"].map((opt) => {
-                          if (!q[`Option${opt}`]) return null; 
-                          
+                          if (!q[`Option${opt}`]) return null;
+
                           let labelClass = "option-label";
                           const isCorrectAns = q.CorrectAnswer?.trim().toUpperCase() === opt;
                           const isUserSelected = answers[q.QuestionNo] === opt;
@@ -425,29 +425,29 @@ const TakingExam = () => {
           <div className="questions-list">
             {displayedQuestions.map((q, index) => {
               const showAudioPlayer = q.AudioUrl && (index === 0 || q.AudioUrl !== displayedQuestions[index - 1].AudioUrl);
-              
+
               // 💡 ĐÃ TỐI ƯU UX: Sơ đồ đồ họa chia sẻ chung cho 3 câu Part 3/4 sẽ CHỈ HIỆN 1 LẦN, tránh lặp lại 3 tấm ảnh giống nhau
               const showGraphicImage = q.ImageUrl && (index === 0 || q.ImageUrl !== displayedQuestions[index - 1].ImageUrl);
 
               return (
                 <div key={q.QuestionNo} id={`question-${q.QuestionNo}`} className="question-item">
                   {showAudioPlayer && (
-                     <div className="question-audio-wrapper">
-                         <audio controls style={{ width: "100%", height: "40px" }}><source src={q.AudioUrl} type="audio/mpeg" /></audio>
-                     </div>
+                    <div className="question-audio-wrapper">
+                      <audio controls style={{ width: "100%", height: "40px" }}><source src={q.AudioUrl} type="audio/mpeg" /></audio>
+                    </div>
                   )}
 
                   {/* 🖼 HIỂN THỊ ĐỒ HỌA PART 3/4 KHÔNG LẶP LẠI */}
                   {showGraphicImage && (
-                     <img src={q.ImageUrl} alt={`Sơ đồ đồ họa`} style={{maxWidth: "100%", maxHeight: "480px", display: 'block', margin: "10px 0 20px 0", borderRadius: "10px", boxShadow: '0 4px 15px rgba(0,0,0,0.06)', border: '1px solid #e2e8f0'}} />
+                    <img src={q.ImageUrl} alt={`Sơ đồ đồ họa`} style={{ maxWidth: "100%", maxHeight: "480px", display: 'block', margin: "10px 0 20px 0", borderRadius: "10px", boxShadow: '0 4px 15px rgba(0,0,0,0.06)', border: '1px solid #e2e8f0' }} />
                   )}
 
                   <p className="question-text"><strong>Câu {q.QuestionNo}:</strong> {q.QuestionText}</p>
-                  
+
                   <div className="options-group">
                     {["A", "B", "C", "D"].map((opt) => {
-                      if (!q[`Option${opt}`]) return null; 
-                      
+                      if (!q[`Option${opt}`]) return null;
+
                       let labelClass = "option-label";
                       const isCorrectAns = q.CorrectAnswer?.trim().toUpperCase() === opt;
                       const isUserSelected = answers[q.QuestionNo] === opt;
@@ -501,7 +501,7 @@ const TakingExam = () => {
 
         <div className="question-navigation">
           <h3 style={{ textAlign: "center", marginBottom: "15px", fontSize: "16px" }}>BẢNG CÂU HỎI</h3>
-          
+
           {availableParts.map((part) => {
             const partQuestionNumbers = [];
             for (let i = part.start; i <= part.end; i++) {
@@ -515,13 +515,13 @@ const TakingExam = () => {
                   {partQuestionNumbers.map((qNo) => {
                     let boxClass = "q-box";
                     if (isSubmitted || isReviewMode) {
-                       const correctAns = questions.find(q => q.QuestionNo === qNo)?.CorrectAnswer?.trim().toUpperCase();
-                       const userAns = answers[qNo]?.trim().toUpperCase();
-                       if (!userAns) boxClass += " unattempted"; 
-                       else if (userAns === correctAns) boxClass += " correct"; 
-                       else boxClass += " wrong"; 
+                      const correctAns = questions.find(q => q.QuestionNo === qNo)?.CorrectAnswer?.trim().toUpperCase();
+                      const userAns = answers[qNo]?.trim().toUpperCase();
+                      if (!userAns) boxClass += " unattempted";
+                      else if (userAns === correctAns) boxClass += " correct";
+                      else boxClass += " wrong";
                     } else {
-                       if (answers[qNo]) boxClass += " answered";
+                      if (answers[qNo]) boxClass += " answered";
                     }
 
                     return (
