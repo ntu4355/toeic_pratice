@@ -43,6 +43,18 @@ const userSchema = new mongoose.Schema({
 }, { timestamps: true });
 const User = mongoose.model('User', userSchema);
 
+const jobSchema = new mongoose.Schema({
+    type: { type: String, required: true },
+    status: { type: String, enum: ['pending', 'processing', 'done', 'failed'], default: 'pending' },
+    progress: { type: Number, default: 0 },
+    message: { type: String, default: '' },
+    error: { type: String, default: null },
+    examId: { type: mongoose.Schema.Types.ObjectId, ref: 'Exam', default: null },
+    examName: String,
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+}, { timestamps: true });
+const Job = mongoose.model('Job', jobSchema);
+
 // --- CLOUDINARY ---
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -53,9 +65,129 @@ cloudinary.config({
 // --- GEMINI AI ---
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const fileManager = new GoogleAIFileManager(process.env.GEMINI_API_KEY);
+const GEMINI_EXTRACT_MODEL = process.env.GEMINI_EXTRACT_MODEL || "gemini-2.0-flash";   // Dùng cho đề thi (nhiều trang, cần limit cao)
+const GEMINI_KEY_MODEL     = process.env.GEMINI_KEY_MODEL     || "gemini-2.5-flash";   // Dùng cho file đáp án (ít trang, cần đọc chính xác)
+const GEMINI_CLEANUP_MODEL = process.env.GEMINI_CLEANUP_MODEL || "gemini-2.0-flash-lite"; // Dùng để clean JSON lỗi
 
 const upload = multer({ dest: 'uploads/' });
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Sleep thông minh: chỉ sleep 60s khi bị rate limit 429, còn lại chỉ nghỉ 3s giữa các chunk
+const RATE_LIMIT_SLEEP = 60000;
+const POLITE_DELAY = 3000;
+const isRateLimitError = (error) => {
+    const msg = (error?.message || "").toLowerCase();
+    const status = error?.status || error?.code || 0;
+    return status === 429 || msg.includes("429") || msg.includes("quota") || msg.includes("rate limit") || msg.includes("resource_exhausted");
+};
+const smartSleep = async (error, label = "") => {
+    if (isRateLimitError(error)) {
+        console.log(`[${label}] ⏳ Rate limit! Ngủ 60s để hồi phục...`);
+        await sleep(RATE_LIMIT_SLEEP);
+    } else {
+        console.log(`[${label}] ↻ Thử lại sau 3s...`);
+        await sleep(3000);
+    }
+};
+
+const getJsonModel = (modelName) => genAI.getGenerativeModel({
+    model: modelName,
+    generationConfig: { responseMimeType: "application/json" }
+});
+
+const updateJob = async (jobId, patch) => {
+    if (!jobId) return null;
+    try {
+        return await Job.findByIdAndUpdate(jobId, patch, { new: true });
+    } catch (error) {
+        console.error("[Job] Cannot update job:", error.message);
+        return null;
+    }
+};
+
+const parseJsonObject = (rawText) => {
+    if (!rawText || typeof rawText !== "string") return null;
+    try {
+        return JSON.parse(rawText);
+    } catch {}
+
+    const firstBrace = rawText.indexOf('{');
+    const lastBrace = rawText.lastIndexOf('}');
+    if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) return null;
+
+    try {
+        return JSON.parse(rawText.substring(firstBrace, lastBrace + 1));
+    } catch {
+        return null;
+    }
+};
+
+const parseAiJson = async (rawText, schemaDescription, emptyFallback) => {
+    const localParsed = parseJsonObject(rawText);
+    if (localParsed) return localParsed;
+
+    const cleanupModel = getJsonModel(GEMINI_CLEANUP_MODEL);
+    const cleanupPrompt = `Clean and repair this AI output into one valid JSON object.
+Schema:
+${schemaDescription}
+Rules:
+- Return JSON only.
+- Do not add markdown.
+- If the source has no usable data, return this exact empty object: ${JSON.stringify(emptyFallback)}
+
+AI output:
+${rawText || ""}`;
+
+    const cleanupResult = await cleanupModel.generateContent([{ text: cleanupPrompt }]);
+    return parseJsonObject(cleanupResult.response.text()) || emptyFallback;
+};
+
+const cleanString = (value) => typeof value === "string" ? value.trim() : "";
+const toNumber = (value) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+};
+const normalizeAnswer = (value) => {
+    const match = String(value || "").trim().toUpperCase().match(/[A-D]/);
+    return match ? match[0] : "";
+};
+const inferPartFromQuestionNo = (questionNo) => {
+    if (questionNo >= 1 && questionNo <= 6) return 1;
+    if (questionNo >= 7 && questionNo <= 31) return 2;
+    if (questionNo >= 32 && questionNo <= 70) return 3;
+    if (questionNo >= 71 && questionNo <= 100) return 4;
+    if (questionNo >= 101 && questionNo <= 130) return 5;
+    if (questionNo >= 131 && questionNo <= 146) return 6;
+    if (questionNo >= 147 && questionNo <= 200) return 7;
+    return null;
+};
+const normalizeKeyItem = (item) => {
+    const questionNo = toNumber(item?.QuestionNo);
+    if (!questionNo || questionNo < 1 || questionNo > 200) return null;
+    return {
+        QuestionNo: questionNo,
+        CorrectAnswer: normalizeAnswer(item?.CorrectAnswer),
+        Explanation: cleanString(item?.Explanation)
+    };
+};
+const normalizeQuestionItem = (item) => {
+    const questionNo = toNumber(item?.QuestionNo);
+    if (!questionNo || questionNo < 1 || questionNo > 200) return null;
+
+    const part = toNumber(item?.Part) || inferPartFromQuestionNo(questionNo);
+    if (!part) return null;
+
+    return {
+        Part: part,
+        QuestionNo: questionNo,
+        QuestionText: cleanString(item?.QuestionText),
+        OptionA: cleanString(item?.OptionA),
+        OptionB: cleanString(item?.OptionB),
+        OptionC: cleanString(item?.OptionC),
+        OptionD: cleanString(item?.OptionD),
+        PassageText: cleanString(item?.PassageText)
+    };
+};
 
 const authenticate = (req, res, next) => {
     const authHeader = req.headers.authorization || "";
@@ -137,9 +269,7 @@ async function processKeyPdf(filePath, keyName) {
                     mimeType: "application/pdf", displayName: `Đáp án ${keyName} Trang ${j+1}-${endIndex}`,
                 });
 
-                const model = genAI.getGenerativeModel({ 
-                    model: "gemini-2.5-flash", generationConfig: { responseMimeType: "application/json" }
-                });
+                const model = getJsonModel(GEMINI_KEY_MODEL);
 
                 const PROMPT_KEY = `Bạn là chuyên gia chấm thi TOEIC. Hãy bóc tách ĐÁP ÁN ĐÚNG và LỜI GIẢI THÍCH từ tài liệu sau.
                 - YÊU CẦU QUAN TRỌNG: Phần "Explanation" BẮT BUỘC phải lấy toàn bộ Transcript (Lời thoại), Giải thích chi tiết và DỊCH NGHĨA TIẾNG VIỆT.
@@ -153,37 +283,34 @@ async function processKeyPdf(filePath, keyName) {
                     { text: PROMPT_KEY },
                 ]);
 
-                let rawText = result.response.text();
-                const firstBrace = rawText.indexOf('{');
-                const lastBrace = rawText.lastIndexOf('}');
+                const rawText = result.response.text();
+                const parsedData = await parseAiJson(
+                    rawText,
+                    '{ "keys": [ { "QuestionNo": number, "CorrectAnswer": "A|B|C|D", "Explanation": string } ] }',
+                    { keys: [] }
+                );
 
-                if (firstBrace !== -1 && lastBrace !== -1) {
-                    const parsedData = JSON.parse(rawText.substring(firstBrace, lastBrace + 1));
-                    if (parsedData.keys && Array.isArray(parsedData.keys)) {
-                        parsedData.keys.forEach(k => {
-                            if (k.QuestionNo) {
-                                extractedKeys[k.QuestionNo] = {
-                                    CorrectAnswer: k.CorrectAnswer || "",
-                                    Explanation: k.Explanation || ""
-                                };
-                            }
-                        });
-                        chunkSuccess = true;
-                        console.log(`[Key Parser] [V] Đã lấy thành công đáp án của ${parsedData.keys.length} câu.`);
-                    }
+                if (parsedData.keys && Array.isArray(parsedData.keys)) {
+                    const normalizedKeys = parsedData.keys.map(normalizeKeyItem).filter(Boolean);
+                    normalizedKeys.forEach(k => {
+                        extractedKeys[k.QuestionNo] = {
+                            CorrectAnswer: k.CorrectAnswer,
+                            Explanation: k.Explanation
+                        };
+                    });
+                    chunkSuccess = true;
+                    console.log(`[Key Parser] [V] Đã lấy thành công đáp án của ${normalizedKeys.length} câu.`);
                 }
             } catch (error) {
                 console.error(`[Key Parser] [!] Lỗi đọc đáp án (Lần thử ${attempt}):`, error.message);
-                if (attempt < 3) await sleep(60000); 
+                if (attempt < 3) await smartSleep(error, "Key Parser");
             } finally {
                 if (uploadResponse) try { await fileManager.deleteFile(uploadResponse.file.name); } catch(e){}
             }
         }
         try { fs.unlinkSync(tempPdfPath); } catch(e){}
-        if (j + pagesPerChunk < totalPages) {
-            console.log(`[Key Parser] ⏳ Ngủ 60s chờ hồi Token...`);
-            await sleep(60000);
-        }
+        // Nghỉ nhỏ giữa các chunk để không spam API
+        if (j + pagesPerChunk < totalPages) await sleep(POLITE_DELAY);
     }
     try { fs.unlinkSync(filePath); } catch(e){}
     return extractedKeys;
@@ -192,14 +319,20 @@ async function processKeyPdf(filePath, keyName) {
 // ==========================================
 // HÀM CHẠY NGẦM BÓC TÁCH ĐỀ THI (TẠO MỚI)
 // ==========================================
-async function processExamInBackground(pdfFiles, examName, duration, partsArray, cropFiles, zipFilePath, listeningKeyPath, readingKeyPath) {
+async function processExamInBackground(pdfFiles, examName, duration, partsArray, cropFiles, zipFilePath, listeningKeyPath, readingKeyPath, jobId = null) {
     try {
         console.log(`\n======================================================`);
         console.log(`[Worker] Bắt đầu xử lý ĐỀ THI: ${examName}`);
+        await updateJob(jobId, { status: 'processing', progress: 5, message: 'Đang đọc file đáp án bằng AI...' });
         
-        const listeningKeys = await processKeyPdf(listeningKeyPath, "Listening");
-        const readingKeys = await processKeyPdf(readingKeyPath, "Reading");
-        const allKeys = { ...listeningKeys, ...readingKeys }; 
+        // Chạy song song 2 file key để tiết kiệm thời gian
+        console.log(`[Worker] ⚡ Chạy song song 2 file đáp án...`);
+        const [listeningKeys, readingKeys] = await Promise.all([
+            processKeyPdf(listeningKeyPath, "Listening"),
+            processKeyPdf(readingKeyPath, "Reading"),
+        ]);
+        const allKeys = { ...listeningKeys, ...readingKeys };
+        await updateJob(jobId, { progress: 25, message: 'Đã đọc đáp án, đang xử lý ảnh và audio...' });
 
         let finalQuestionsArray = [];
         let audioUrlMap = {}; 
@@ -265,6 +398,8 @@ async function processExamInBackground(pdfFiles, examName, duration, partsArray,
             }
         }
 
+        await updateJob(jobId, { progress: 40, message: 'Đã xử lý media, đang bóc câu hỏi từ PDF...' });
+
         if (pdfFiles && pdfFiles.length > 0) {
             console.log(`\n[+] Bắt đầu quét nội dung File Đề Thi...`);
             for (let i = 0; i < pdfFiles.length; i++) {
@@ -279,6 +414,8 @@ async function processExamInBackground(pdfFiles, examName, duration, partsArray,
                     
                     // 💡 THÊM MỚI LOG TIẾN ĐỘ: Giúp bạn biết hệ thống đang chạy đến trang mấy
                     console.log(`[Exam Parser] 🧠 Đang quét Đề thi (Trang ${j + 1} - ${endIndex} / Tổng ${totalPages} trang)...`);
+                    const chunkProgress = Math.min(90, 40 + Math.round(((i + (j / totalPages)) / pdfFiles.length) * 50));
+                    await updateJob(jobId, { progress: chunkProgress, message: `Đang quét PDF ${i + 1}/${pdfFiles.length}, trang ${j + 1}-${endIndex}...` });
 
                     const subDocument = await PDFDocument.create();
                     const indices = Array.from({length: endIndex - j}, (_, index) => j + index);
@@ -299,9 +436,7 @@ async function processExamInBackground(pdfFiles, examName, duration, partsArray,
                                 mimeType: "application/pdf", displayName: `Đề thi Trang ${j + 1}-${endIndex}`,
                             });
                             
-                            const model = genAI.getGenerativeModel({ 
-                                model: "gemini-2.5-flash", generationConfig: { responseMimeType: "application/json" }
-                            });
+                            const model = getJsonModel(GEMINI_EXTRACT_MODEL);
 
                             const PROMPT_TOEIC = `Bạn là chuyên gia TOEIC. Hãy bóc tách các câu hỏi trắc nghiệm từ văn bản.
                             - Lấy CHUẨN XÁC số thứ tự câu hỏi (QuestionNo).
@@ -315,17 +450,18 @@ async function processExamInBackground(pdfFiles, examName, duration, partsArray,
                                 { text: PROMPT_TOEIC },
                             ]);
 
-                            let rawText = result.response.text();
-                            const firstBrace = rawText.indexOf('{');
-                            const lastBrace = rawText.lastIndexOf('}');
-
-                            if (firstBrace !== -1 && lastBrace !== -1) {
-                                const parsedData = JSON.parse(rawText.substring(firstBrace, lastBrace + 1));
-                                
-                                // 💡 SỬA LỖI LOGIC: Chỉ cần AI trả về mảng hợp lệ (kể cả 0 câu) là cho qua luôn, không ép loop lại
-                                if (parsedData.questions && Array.isArray(parsedData.questions)) {
-                                    if (parsedData.questions.length > 0) {
-                                        const processedQuestions = parsedData.questions.map(q => {
+                            const rawText = result.response.text();
+                            const parsedData = await parseAiJson(
+                                rawText,
+                                '{ "questions": [ { "Part": number, "QuestionNo": number, "QuestionText": string, "OptionA": string, "OptionB": string, "OptionC": string, "OptionD": string, "PassageText": "" } ] }',
+                                { questions: [] }
+                            );
+                            
+                            // 💡 SỬA LỖI LOGIC: Chỉ cần AI trả về mảng hợp lệ (kể cả 0 câu) là cho qua luôn, không ép loop lại
+                            if (parsedData.questions && Array.isArray(parsedData.questions)) {
+                                const normalizedQuestions = parsedData.questions.map(normalizeQuestionItem).filter(Boolean);
+                                if (normalizedQuestions.length > 0) {
+                                    const processedQuestions = normalizedQuestions.map(q => {
                                             let pImages = [];
                                             let graphicUrl = ""; 
 
@@ -357,22 +493,21 @@ async function processExamInBackground(pdfFiles, examName, duration, partsArray,
                                         });
 
                                         finalQuestionsArray = [...finalQuestionsArray, ...processedQuestions];
-                                    }
-                                    chunkSuccess = true; 
-                                    console.log(`[Exam Parser] [V] Đã đọc xong Trang ${j+1}-${endIndex}. Ghi nhận thêm ${parsedData.questions.length} câu mới.`);
                                 }
+                                chunkSuccess = true; 
+                                console.log(`[Exam Parser] [V] Đã đọc xong Trang ${j+1}-${endIndex}. Ghi nhận thêm ${normalizedQuestions.length} câu mới.`);
                             }
                         } catch (error) {
                             console.error(`[Exam Parser] ❌ Lỗi quét nội dung (Lần thử ${attempt}):`, error.message);
-                            if (attempt < 3) await sleep(60000);
+                            if (attempt < 3) await smartSleep(error, "Exam Parser");
                         } finally {
                             if (uploadResponse) try { await fileManager.deleteFile(uploadResponse.file.name); } catch(e){}
                         }
                     } 
                     try { fs.unlinkSync(tempPdfPath); } catch(e){}
+                    // Nghỉ nhỏ giữa các chunk để không spam API
                     if (j + pagesPerChunk < totalPages || i < pdfFiles.length - 1) {
-                        console.log(`[Exam Parser] ⏳ Nghỉ 60 giây chống sập nghẽn Token...`);
-                        await sleep(60000);
+                        await sleep(POLITE_DELAY);
                     }
                 }
                 try { fs.unlinkSync(pdfFile.path); } catch(e){}
@@ -387,11 +522,15 @@ async function processExamInBackground(pdfFiles, examName, duration, partsArray,
         if (finalQuestionsArray.length > 0) {
             const newExam = new Exam({ name: examName, duration: duration, questions: finalQuestionsArray });
             await newExam.save();
+            await updateJob(jobId, { status: 'done', progress: 100, message: `Đã tạo đề thi với ${finalQuestionsArray.length} câu.`, examId: newExam._id });
             console.log(`[Worker] 💾 ĐÃ LƯU THÀNH CÔNG ĐỀ THI KÈM ĐÁP ÁN & GIẢI THÍCH VÀO DATABASE!`);
+        } else {
+            await updateJob(jobId, { status: 'failed', progress: 100, message: 'AI không bóc được câu hỏi nào từ file đã upload.', error: 'No questions extracted' });
         }
 
     } catch (error) {
         console.error(`[Worker] ❌ Lỗi xử lý ngầm:`, error.message);
+        await updateJob(jobId, { status: 'failed', message: 'Xử lý đề thi thất bại.', error: error.message });
     }
 }
 
@@ -405,7 +544,7 @@ app.post('/api/upload-exam', authenticate, requireAdmin, upload.any(), async (re
 
         const examName = req.body.name || "Đề thi TOEIC Mới";
         const duration = req.body.duration || 120;
-        const selectedParts = JSON.parse(req.body.parts || "[]");
+        const selectedParts = JSON.parse(req.body.parts || "[]").map(Number);
 
         const pdfFiles = files.filter(f => f.fieldname === 'examFiles' && f.mimetype === 'application/pdf');
         const zipFile = files.find(f => f.fieldname === 'audioZip' || f.originalname.toLowerCase().endsWith('.zip'));
@@ -413,13 +552,26 @@ app.post('/api/upload-exam', authenticate, requireAdmin, upload.any(), async (re
         const listeningKeyFile = files.find(f => f.fieldname === 'listeningKey');
         const readingKeyFile = files.find(f => f.fieldname === 'readingKey');
 
-        res.json({ message: "Đã tiếp nhận toàn bộ file! Hệ thống AI đang bắt đầu chấm và đọc đề..." });
+        const job = await new Job({
+            type: 'create_exam',
+            status: 'pending',
+            progress: 0,
+            message: 'Đã nhận file, đang chuẩn bị xử lý AI.',
+            examName,
+            createdBy: req.user.id
+        }).save();
+
+        res.status(202).json({
+            message: "Đã tiếp nhận toàn bộ file! Hệ thống AI đang chạy nền.",
+            jobId: job._id
+        });
 
         processExamInBackground(
             pdfFiles, examName, duration, selectedParts, cropFiles, 
             zipFile ? zipFile.path : null,
             listeningKeyFile ? listeningKeyFile.path : null,
-            readingKeyFile ? readingKeyFile.path : null
+            readingKeyFile ? readingKeyFile.path : null,
+            job._id
         );
 
     } catch (error) {
@@ -428,10 +580,40 @@ app.post('/api/upload-exam', authenticate, requireAdmin, upload.any(), async (re
 });
 
 app.get('/api/exams', async (req, res) => {
-    try { res.json(await Exam.find().sort({ createdAt: -1 })); } catch (error) { res.status(500).json({ message: "Lỗi" }); }
+    try {
+        // Chỉ trả về thông tin cơ bản, KHÔNG kèm mảng questions để giảm tải
+        const exams = await Exam.find().select('-questions').sort({ createdAt: -1 });
+        // Thêm questionCount bằng cách query riêng (aggregate)
+        const counts = await Exam.aggregate([
+            { $project: { questionCount: { $size: { $ifNull: ['$questions', []] } } } }
+        ]);
+        const countMap = Object.fromEntries(counts.map(c => [String(c._id), c.questionCount]));
+        const result = exams.map(e => ({ ...e.toObject(), questionCount: countMap[String(e._id)] || 0 }));
+        res.json(result);
+    } catch (error) { res.status(500).json({ message: "Lỗi" }); }
+});
+app.get('/api/exams/:id', async (req, res) => {
+    try {
+        const exam = await Exam.findById(req.params.id);
+        if (!exam) return res.status(404).json({ message: "Không tìm thấy đề thi." });
+        res.json(exam);
+    } catch (error) { res.status(500).json({ message: "Lỗi" }); }
 });
 app.delete('/api/exams/:id', authenticate, requireAdmin, async (req, res) => {
     try { await Exam.findByIdAndDelete(req.params.id); res.json({ message: "Đã xóa!" }); } catch (error) { res.status(500).json({ message: "Lỗi" }); }
+});
+
+app.get('/api/jobs/:id', authenticate, async (req, res) => {
+    try {
+        const job = await Job.findById(req.params.id);
+        if (!job) return res.status(404).json({ message: "Không tìm thấy job." });
+        if (req.user.role !== "admin" && String(job.createdBy || "") !== String(req.user.id)) {
+            return res.status(403).json({ message: "Bạn không có quyền xem tiến độ này." });
+        }
+        res.json(job);
+    } catch (error) {
+        res.status(500).json({ message: "Lỗi lấy tiến độ xử lý." });
+    }
 });
 
 // ==========================================
@@ -451,15 +633,32 @@ app.put('/api/exams/:id/append-files', authenticate, requireAdmin, upload.any(),
             return res.json({ message: "Đã cập nhật thông tin cơ bản (Không có file mới)." });
         }
 
-        res.json({ message: "Đã lưu thông tin! Hệ thống AI đang chạy ngầm để gộp và sắp xếp file mới..." });
+        const job = await new Job({
+            type: 'update_exam',
+            status: 'pending',
+            progress: 0,
+            message: 'Đã nhận file bổ sung, đang chuẩn bị xử lý AI.',
+            examId,
+            examName: req.body.name,
+            createdBy: req.user.id
+        }).save();
+
+        res.status(202).json({
+            message: "Đã lưu thông tin! Hệ thống AI đang chạy nền để gộp file mới.",
+            jobId: job._id
+        });
 
         setTimeout(async () => {
             try {
+                await updateJob(job._id, { status: 'processing', progress: 5, message: 'Đang đọc dữ liệu đề hiện tại...' });
                 console.log(`\n[Worker Update] Đang bóc tách file bổ sung cho đề thi ID: ${examId}`);
                 const exam = await Exam.findById(examId);
-                if (!exam) return;
+                if (!exam) {
+                    await updateJob(job._id, { status: 'failed', error: 'Exam not found', message: 'Không tìm thấy đề thi cần cập nhật.' });
+                    return;
+                }
 
-                let updatedQuestions = [...exam.questions];
+                let updatedQuestions = [...(exam.questions || [])];
                 let allKeys = {};
                 let taskImageMap = {}; 
 
@@ -473,6 +672,7 @@ app.put('/api/exams/:id/append-files', authenticate, requireAdmin, upload.any(),
                 const cropFiles = files.filter(f => f.mimetype.startsWith('image/')); 
 
                 if (cropFiles && cropFiles.length > 0) {
+                    await updateJob(job._id, { progress: 15, message: 'Đang upload ảnh crop bổ sung...' });
                     console.log(`\n[+] Đang đẩy ${cropFiles.length} bức ảnh scan bổ sung lên Cloudinary...`);
                     for (const file of cropFiles) {
                         try {
@@ -486,6 +686,7 @@ app.put('/api/exams/:id/append-files', authenticate, requireAdmin, upload.any(),
                 }
 
                 if (examPdfFiles && examPdfFiles.length > 0) {
+                    await updateJob(job._id, { progress: 25, message: 'Đang bóc câu hỏi bổ sung từ PDF...' });
                     console.log(`\n[+] Bắt đầu quét nội dung ${examPdfFiles.length} File ĐỀ THI bổ sung...`);
                     for (let i = 0; i < examPdfFiles.length; i++) {
                         const examPdfFile = examPdfFiles[i];
@@ -497,6 +698,8 @@ app.put('/api/exams/:id/append-files', authenticate, requireAdmin, upload.any(),
                         for (let j = 0; j < totalPages; j += pagesPerChunk) {
                             const endIndex = Math.min(j + pagesPerChunk, totalPages);
                             console.log(`[Worker Update] 🧠 Đang quét bổ sung (Trang ${j + 1} - ${endIndex} / Tổng ${totalPages} trang)...`);
+                            const chunkProgress = Math.min(65, 25 + Math.round(((i + (j / totalPages)) / examPdfFiles.length) * 40));
+                            await updateJob(job._id, { progress: chunkProgress, message: `Đang quét file bổ sung ${i + 1}/${examPdfFiles.length}, trang ${j + 1}-${endIndex}...` });
 
                             const subDocument = await PDFDocument.create();
                             const indices = Array.from({length: endIndex - j}, (_, index) => j + index);
@@ -517,9 +720,7 @@ app.put('/api/exams/:id/append-files', authenticate, requireAdmin, upload.any(),
                                         mimeType: "application/pdf", displayName: `Đề thi bổ sung Trang ${j + 1}-${endIndex}`,
                                     });
 
-                                    const model = genAI.getGenerativeModel({
-                                        model: "gemini-2.5-flash", generationConfig: { responseMimeType: "application/json" }
-                                    });
+                                    const model = getJsonModel(GEMINI_EXTRACT_MODEL);
 
                                     const PROMPT_TOEIC = `Bạn là chuyên gia TOEIC. Hãy bóc tách các câu hỏi trắc nghiệm từ văn bản.
                                     - Lấy CHUẨN XÁC số thứ tự câu hỏi (QuestionNo).
@@ -535,17 +736,18 @@ app.put('/api/exams/:id/append-files', authenticate, requireAdmin, upload.any(),
                                         { text: PROMPT_TOEIC },
                                     ]);
 
-                                    let rawText = result.response.text();
-                                    const firstBrace = rawText.indexOf('{');
-                                    const lastBrace = rawText.lastIndexOf('}');
-
-                                    if (firstBrace !== -1 && lastBrace !== -1) {
-                                        const parsedData = JSON.parse(rawText.substring(firstBrace, lastBrace + 1));
-                                        
-                                        // 💡 ĐỒNG BỘ SỬA LỖI LOGIC TẠI ĐÂY CHO ĐƯỜNG UPDATE
-                                        if (parsedData.questions && Array.isArray(parsedData.questions)) {
-                                            if (parsedData.questions.length > 0) {
-                                                parsedData.questions.forEach(newQ => {
+                                    const rawText = result.response.text();
+                                    const parsedData = await parseAiJson(
+                                        rawText,
+                                        '{ "questions": [ { "Part": number, "QuestionNo": number, "QuestionText": string, "OptionA": string, "OptionB": string, "OptionC": string, "OptionD": string, "PassageText": "" } ] }',
+                                        { questions: [] }
+                                    );
+                                    
+                                    // 💡 ĐỒNG BỘ SỬA LỖI LOGIC TẠI ĐÂY CHO ĐƯỜNG UPDATE
+                                    if (parsedData.questions && Array.isArray(parsedData.questions)) {
+                                        const normalizedQuestions = parsedData.questions.map(normalizeQuestionItem).filter(Boolean);
+                                        if (normalizedQuestions.length > 0) {
+                                            normalizedQuestions.forEach(newQ => {
                                                     const existingQIndex = updatedQuestions.findIndex(q => q.QuestionNo === newQ.QuestionNo);
                                                     if (existingQIndex !== -1) {
                                                         updatedQuestions[existingQIndex] = { ...updatedQuestions[existingQIndex], ...newQ };
@@ -555,22 +757,20 @@ app.put('/api/exams/:id/append-files', authenticate, requireAdmin, upload.any(),
                                                         });
                                                     }
                                                 });
-                                            }
-                                            chunkSuccess = true;
-                                            console.log(`[Worker Update] [V] Đã xử lý xong Trang ${j+1}-${endIndex}. Nhận thêm ${parsedData.questions.length} câu.`);
                                         }
+                                        chunkSuccess = true;
+                                        console.log(`[Worker Update] [V] Đã xử lý xong Trang ${j+1}-${endIndex}. Nhận thêm ${normalizedQuestions.length} câu.`);
                                     }
                                 } catch (error) {
                                     console.error(`[Worker Update] ❌ Lỗi quét bổ sung (Lần thử ${attempt}):`, error.message);
-                                    if (attempt < 3) await sleep(60000);
+                                    if (attempt < 3) await smartSleep(error, "Worker Update");
                                 } finally {
                                     if (uploadResponse) try { await fileManager.deleteFile(uploadResponse.file.name); } catch(e){}
                                 }
                             }
                             try { fs.unlinkSync(tempPdfPath); } catch(e){}
                             if (j + pagesPerChunk < totalPages || i < examPdfFiles.length - 1) {
-                                console.log(`[Worker Update] ⏳ Nghỉ 60 giây chống sập nghẽn Token...`);
-                                await sleep(60000);
+                                await sleep(POLITE_DELAY);
                             }
                         }
                         try { fs.unlinkSync(examPdfFile.path); } catch(e){} 
@@ -578,10 +778,12 @@ app.put('/api/exams/:id/append-files', authenticate, requireAdmin, upload.any(),
                 }
 
                 if (listeningKeyFile) {
+                    await updateJob(job._id, { progress: 70, message: 'Đang đọc đáp án Listening bổ sung...' });
                     const keys = await processKeyPdf(listeningKeyFile.path, "Listening (Bổ sung)");
                     allKeys = { ...allKeys, ...keys };
                 }
                 if (readingKeyFile) {
+                    await updateJob(job._id, { progress: 75, message: 'Đang đọc đáp án Reading bổ sung...' });
                     const keys = await processKeyPdf(readingKeyFile.path, "Reading (Bổ sung)");
                     allKeys = { ...allKeys, ...keys };
                 }
@@ -600,6 +802,7 @@ app.put('/api/exams/:id/append-files', authenticate, requireAdmin, upload.any(),
                 }
 
                 if (zipFile && fs.existsSync(zipFile.path)) {
+                    await updateJob(job._id, { progress: 82, message: 'Đang xử lý audio bổ sung...' });
                     console.log(`\n[+] Đang giải nén và up Audio bổ sung...`);
                     const extractedPath = path.join(process.cwd(), `uploads/audio_update_${Date.now()}`);
                     fs.mkdirSync(extractedPath, { recursive: true });
@@ -675,10 +878,12 @@ app.put('/api/exams/:id/append-files', authenticate, requireAdmin, upload.any(),
 
                 exam.questions = updatedQuestions;
                 await exam.save();
+                await updateJob(job._id, { status: 'done', progress: 100, message: `Đã cập nhật đề thi. Tổng hiện tại ${updatedQuestions.length} câu.`, examId: exam._id, examName: exam.name });
                 console.log(`[Worker Update] 🎉 Đã gộp và sắp xếp thành công! Tổng số câu hiện tại: ${updatedQuestions.length}`);
 
             } catch (error) {
                 console.error(`[Worker Update] Lỗi:`, error.message);
+                await updateJob(job._id, { status: 'failed', message: 'Cập nhật đề thi thất bại.', error: error.message });
             }
         }, 1000); 
 
@@ -712,17 +917,22 @@ const Result = mongoose.model('Result', resultSchema);
 app.post('/api/results', authenticate, async (req, res) => {
     try {
         const resultPayload = { ...req.body };
-        if (req.user.role !== "admin") {
-            resultPayload.userId = req.user.id;
-        } else if (!resultPayload.userId) {
-            resultPayload.userId = req.user.id;
-        }
+        resultPayload.userId = req.user.id;
 
         const newResult = new Result(resultPayload);
         await newResult.save();
         res.status(201).json({ message: "Lưu lịch sử thành công!", result: newResult });
     } catch (error) { 
         res.status(500).json({ message: "Lỗi lưu kết quả" }); 
+    }
+});
+
+app.get('/api/results/me', authenticate, async (req, res) => {
+    try {
+        const results = await Result.find({ userId: req.user.id }).sort({ createdAt: -1 });
+        res.json(results);
+    } catch (error) {
+        res.status(500).json({ message: "Lỗi lấy lịch sử" });
     }
 });
 

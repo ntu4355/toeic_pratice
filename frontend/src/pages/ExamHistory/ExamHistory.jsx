@@ -10,24 +10,15 @@ const ExamHistory = () => {
 
   useEffect(() => {
     const loadHistory = async () => {
-      const userRaw = localStorage.getItem("currentUser");
-      if (!userRaw) {
-        setDebugMessage("Không tìm thấy trạng thái đăng nhập. Vui lòng thử đăng xuất và đăng nhập lại!");
-        setLoading(false);
-        return;
-      }
-
-      const user = JSON.parse(userRaw);
-      const userId = user.id || user._id;
-
-      if (!userId) {
-        setDebugMessage("Dữ liệu tài khoản lỗi cấu trúc ID.");
+      const token = localStorage.getItem("token");
+      if (!token) {
+        setDebugMessage("Bạn cần đăng nhập để xem lịch sử luyện thi.");
         setLoading(false);
         return;
       }
 
       try {
-        const response = await fetch(`${API_BASE_URL}/api/results/user/${userId}`, {
+        const response = await fetch(`${API_BASE_URL}/api/results/me`, {
           headers: getAuthHeaders(),
         });
 

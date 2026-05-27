@@ -1,11 +1,11 @@
-import { useState, useRef } from 'react';
+import { useRef, useState } from 'react';
 import './CreateExam.css';
 import { API_BASE_URL, getAuthHeaders } from '../../config/api';
 
 // 💡 NHÚNG CÔNG CỤ SCAN DÙNG CHUNG VÀO ĐÂY
 import PdfScannerTool from '../../components/PdfScannerTool'; // Nhớ điều chỉnh lại đường dẫn này cho đúng với thư mục của bạn nhé
 
-const CreateExam = ({ currentUser }) => {
+const CreateExam = ({ currentUser, onJobStarted }) => {
   const [step, setStep] = useState(1);
   const [examName, setExamName] = useState('');
   const [duration, setDuration] = useState(120);
@@ -20,6 +20,8 @@ const CreateExam = ({ currentUser }) => {
   
   // STATE lưu trữ các ảnh được cắt ra từ Component PdfScannerTool
   const [completedCrops, setCompletedCrops] = useState({}); 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [notice, setNotice] = useState("");
 
   if (currentUser !== undefined && currentUser?.role !== 'admin') {
     return (
@@ -54,21 +56,20 @@ const CreateExam = ({ currentUser }) => {
 
   const goToCroppingRoom = (e) => {
     e.preventDefault();
-    if (pdfFiles.length === 0 || !zipFile) return alert('Vui lòng chọn đầy đủ file Đề thi và Audio!');
-    if (!listeningKeyFile || !readingKeyFile) return alert('Vui lòng tải lên đủ 2 file Đáp án (Listening & Reading)!');
     setStep(2);
   };
 
   const submitToBackend = async () => {
-    setStep(3);
+    setIsSubmitting(true);
+    const submittedExamName = examName.trim() || "Đề thi TOEIC mới";
     try {
       const formData = new FormData();
-      formData.append('name', examName);
+      formData.append('name', submittedExamName);
       formData.append('duration', duration);
       formData.append('parts', JSON.stringify([1, 2, 3, 4, 5, 6, 7]));
       
       pdfFiles.forEach(item => formData.append('examFiles', item.rawFile));
-      formData.append('audioZip', zipFile);
+      if (zipFile) formData.append('audioZip', zipFile);
 
       if (listeningKeyFile) formData.append('listeningKey', listeningKeyFile);
       if (readingKeyFile) formData.append('readingKey', readingKeyFile);
@@ -87,17 +88,38 @@ const CreateExam = ({ currentUser }) => {
         headers: getAuthHeaders(),
         body: formData
       });
+      const data = await apiResponse.json();
 
       if (apiResponse.ok) {
-        alert("🚀 Đã đẩy đề và Đáp án lên hệ thống thành công!");
-        window.location.reload();
+        if (data.jobId) {
+          onJobStarted?.({
+            jobId: data.jobId,
+            examName: submittedExamName,
+            type: 'create_exam',
+            message: data.message,
+          });
+          setNotice(`Đã nhận quá trình tạo đề "${submittedExamName}". Bạn có thể chuyển tab hoặc làm việc khác.`);
+          setStep(1);
+          setExamName('');
+          setDuration(120);
+          setPdfFiles([]);
+          setZipFile(null);
+          setListeningKeyFile(null);
+          setReadingKeyFile(null);
+          setCompletedCrops({});
+        } else {
+          setNotice(data.message || 'Đã gửi dữ liệu thành công.');
+          setStep(1);
+        }
       } else {
-        alert("Có lỗi xảy ra khi gửi dữ liệu!");
+        alert(data.message || "Có lỗi xảy ra khi gửi dữ liệu!");
         setStep(2);
       }
     } catch {
       alert("Không thể kết nối đến máy chủ Backend!");
       setStep(2);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -107,6 +129,11 @@ const CreateExam = ({ currentUser }) => {
       {/* ================= BƯỚC 1: UP FILE ================= */}
       {step === 1 && (
         <form className="setup-form" onSubmit={goToCroppingRoom}>
+          {notice && (
+            <div style={{ padding: '12px 14px', marginBottom: '16px', borderRadius: '8px', background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', fontWeight: 700 }}>
+              {notice}
+            </div>
+          )}
           <h2 style={{color: '#5b51d8', marginBottom: '25px', textAlign: 'center'}}>📊 Quản Lý Upload Đề Thi & Đáp Án</h2>
           <div className="form-group">
             <label>Tên Đề Thi TOEIC</label>
@@ -132,18 +159,18 @@ const CreateExam = ({ currentUser }) => {
           </div>
 
           <div className="form-group" style={{ background: '#f0fdf4', padding: '15px', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
-            <label>🔑 Tải lên File PDF Đáp Án Listening (Key + Transcript)</label>
-            <input type="file" accept="application/pdf" onChange={(e) => setListeningKeyFile(e.target.files[0])} required />
+            <label>🔑 Tải lên File PDF Đáp Án Listening (Key + Transcript) - Không bắt buộc</label>
+            <input type="file" accept="application/pdf" onChange={(e) => setListeningKeyFile(e.target.files[0])} />
           </div>
 
           <div className="form-group" style={{ background: '#f0fdf4', padding: '15px', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
-            <label>🔑 Tải lên File PDF Đáp Án Reading (Key + Giải thích)</label>
-            <input type="file" accept="application/pdf" onChange={(e) => setReadingKeyFile(e.target.files[0])} required />
+            <label>🔑 Tải lên File PDF Đáp Án Reading (Key + Giải thích) - Không bắt buộc</label>
+            <input type="file" accept="application/pdf" onChange={(e) => setReadingKeyFile(e.target.files[0])} />
           </div>
 
           <div className="form-group" style={{ background: '#eff6ff', padding: '15px', borderRadius: '8px', border: '1px solid #bfdbfe' }}>
-            <label>🎵 Tải lên File ZIP Audio</label>
-            <input type="file" accept=".zip" onChange={onZipChange} required={!zipFile} ref={zipInputRef} />
+            <label>🎵 Tải lên File ZIP Audio - Không bắt buộc</label>
+            <input type="file" accept=".zip" onChange={onZipChange} ref={zipInputRef} />
             {zipFile && (
                <div className="selected-file-item" style={{marginTop: '10px'}}>
                   <span className="file-name">🎵 {zipFile.name}</span>
@@ -171,20 +198,11 @@ const CreateExam = ({ currentUser }) => {
              setCompletedCrops={setCompletedCrops}
            />
 
-           <div style={{ marginTop: '20px' }}>
-              <button type="button" onClick={submitToBackend} style={{ padding: '12px 30px', borderRadius: '8px', background: '#10b981', color: '#fff', border: 'none', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer', width: '100%' }}>🚀 Hoàn tất & Gửi AI Chấm</button>
+            <div style={{ marginTop: '20px' }}>
+              <button type="button" onClick={submitToBackend} disabled={isSubmitting} style={{ padding: '12px 30px', borderRadius: '8px', background: '#10b981', color: '#fff', border: 'none', fontSize: '16px', fontWeight: 'bold', cursor: isSubmitting ? 'not-allowed' : 'pointer', width: '100%', opacity: isSubmitting ? 0.7 : 1 }}>
+                {isSubmitting ? 'Đang gửi file lên hệ thống...' : '🚀 Hoàn tất & Gửi AI Chấm'}
+              </button>
            </div>
-        </div>
-      )}
-
-      {/* ================= BƯỚC 3: MÀN HÌNH LOADING CHỜ AI ================= */}
-      {step === 3 && (
-        <div className="loading-screen">
-          <div style={{textAlign: 'center'}}>
-            <div style={{fontSize: '50px', marginBottom: '20px'}}>🤖</div>
-            <h2>AI Đang xử lý Đề thi và Đáp án... Bạn vui lòng không đóng trình duyệt.</h2>
-            <p style={{marginTop: '10px', fontSize: '16px'}}>Quá trình này có thể mất 3-5 phút tùy vào độ dài của file Giải thích.</p>
-          </div>
         </div>
       )}
 

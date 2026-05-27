@@ -95,11 +95,13 @@ const TakingExam = () => {
       }
     });
 
-    const projectedCorrectL = totalL > 0 ? Math.round((correctL / totalL) * 100) : 0;
-    const projectedCorrectR = totalR > 0 ? Math.round((correctR / totalR) * 100) : 0;
+    // Chỉ tính điểm TOEIC chuẩn khi thi ĐỦ section (100 câu Listening hoặc 100 câu Reading)
+    // Thi lẻ Part sẽ không quy đổi điểm để tránh kết quả ảo
+    const isFullListening = totalL === 100;
+    const isFullReading = totalR === 100;
 
-    const scoreL = totalL > 0 ? getListeningScore(projectedCorrectL) : 0;
-    const scoreR = totalR > 0 ? getReadingScore(projectedCorrectR) : 0;
+    const scoreL = isFullListening ? getListeningScore(correctL) : 0;
+    const scoreR = isFullReading ? getReadingScore(correctR) : 0;
     const totalScore = scoreL + scoreR;
     const timeSpent = ((examInfo.duration || 120) * 60) - timeLeft;
 
@@ -114,21 +116,21 @@ const TakingExam = () => {
       timeSpent,
       totalListening: totalL,
       totalReading: totalR,
+      isFullListening,
+      isFullReading,
     };
     setScoreInfo(finalScoreInfo);
     setIsSubmitted(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
-    const user = JSON.parse(localStorage.getItem('currentUser') || '{}');
-    const userId = user.id || user._id;
+    const token = localStorage.getItem('token');
 
-    if (userId) {
+    if (token) {
       try {
         await fetch(`${API_BASE_URL}/api/results`, {
           method: 'POST',
           headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({
-            userId: userId,
             examId: examInfo._id || examInfo.id,
             examName: examInfo.name,
             correctListening: correctL,
@@ -160,39 +162,42 @@ const TakingExam = () => {
       return;
     }
 
-    fetch(`${API_BASE_URL}/api/exams`)
-      .then((res) => res.json())
-      .then((data) => {
-        const currentExam = data.find((e) => String(e._id) === String(examId) || String(e.id) === String(examId));
+    fetch(`${API_BASE_URL}/api/exams/${examId}`)
+      .then((res) => {
+        if (!res.ok) throw new Error("Không tìm thấy đề thi");
+        return res.json();
+      })
+      .then((currentExam) => {
+        setExamInfo(currentExam);
+        setTimeLeft(currentExam.duration ? currentExam.duration * 60 : 7200);
 
-        if (currentExam) {
-          setExamInfo(currentExam);
-          setTimeLeft(currentExam.duration ? currentExam.duration * 60 : 7200);
+        let examQuestions = currentExam.questions || [];
 
-          let examQuestions = currentExam.questions || [];
+        if (selectedParts && selectedParts.length > 0) {
+          examQuestions = examQuestions.filter(q => {
+            const matchedPart = partsConfig.find(p => q.QuestionNo >= p.start && q.QuestionNo <= p.end);
+            return matchedPart && selectedParts.includes(matchedPart.id);
+          });
+        }
 
-          if (selectedParts && selectedParts.length > 0) {
-            examQuestions = examQuestions.filter(q => {
-              const matchedPart = partsConfig.find(p => q.QuestionNo >= p.start && q.QuestionNo <= p.end);
-              return matchedPart && selectedParts.includes(matchedPart.id);
-            });
-          }
+        examQuestions.sort((a, b) => a.QuestionNo - b.QuestionNo);
 
-          examQuestions.sort((a, b) => a.QuestionNo - b.QuestionNo);
-
-          if (examQuestions.length > 0) {
-            setQuestions(examQuestions);
-            const firstAvailablePart = partsConfig.find(p =>
-              (selectedParts.length === 0 || selectedParts.includes(p.id)) &&
-              examQuestions.some(q => q.QuestionNo >= p.start && q.QuestionNo <= p.end)
-            );
-            if (firstAvailablePart) setActivePartId(firstAvailablePart.id);
-          } else {
-            alert("Đề thi này chưa có dữ liệu câu hỏi!");
-          }
+        if (examQuestions.length > 0) {
+          setQuestions(examQuestions);
+          const firstAvailablePart = partsConfig.find(p =>
+            (selectedParts.length === 0 || selectedParts.includes(p.id)) &&
+            examQuestions.some(q => q.QuestionNo >= p.start && q.QuestionNo <= p.end)
+          );
+          if (firstAvailablePart) setActivePartId(firstAvailablePart.id);
+        } else {
+          alert("Đề thi này chưa có dữ liệu câu hỏi!");
         }
       })
-      .catch((err) => console.error("Lỗi khi tải đề thi:", err));
+      .catch((err) => {
+        console.error("Lỗi khi tải đề thi:", err);
+        alert("Không tải được đề thi. Vui lòng thử lại!");
+        navigate("/exam");
+      });
   }, [examId, navigate, selectedParts]);
 
   useEffect(() => {
@@ -284,16 +289,36 @@ const TakingExam = () => {
               {isReviewMode ? "🔍 CHI TIẾT BÀI LÀM CŨ" : "🎉 KẾT QUẢ KIỂM TRA"}
             </h2>
             <p style={{ textAlign: 'center', color: '#64748b', fontSize: '14px', margin: '0 0 25px 0' }}>
-              Hệ thống tự động chấm điểm và quy đổi TOEIC theo công thức ước lượng trong bản test
+              {(scoreInfo.isFullListening && scoreInfo.isFullReading)
+                ? "Điểm TOEIC ước lượng dựa trên số câu trả lời đúng"
+                : "Chế độ luyện tập theo Part — xem thống kê câu đúng/sai bên dưới"}
             </p>
+
+            {/* CẢNH BÁO KHI THI LẺ PART */}
+            {!isReviewMode && !(scoreInfo.isFullListening && scoreInfo.isFullReading) && (
+              <div style={{ background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: '10px', padding: '12px 16px', marginBottom: '20px', fontSize: '13.5px', color: '#92400e' }}>
+                ⚠️ <strong>Luyện tập theo Part:</strong> Điểm TOEIC chỉ được tính khi thi đầy đủ 100 câu Listening (Part 1–4) hoặc 100 câu Reading (Part 5–7). Vui lòng xem kết quả theo số câu đúng/sai bên dưới.
+              </div>
+            )}
 
             <div className="result-dashboard-grid">
 
               {/* CỘT ĐIỂM TỔNG SỐ BÊN TRÁI */}
               <div className="score-summary-box">
-                <div className="total-label">TỔNG ĐIỂM</div>
-                <div className="total-score-value">{scoreInfo.totalScore}</div>
-                <div className="total-max">/ 990 Điểm</div>
+                <div className="total-label">{(scoreInfo.isFullListening && scoreInfo.isFullReading) ? "TỔNG ĐIỂM" : "KẾT QUẢ"}</div>
+                {(scoreInfo.isFullListening && scoreInfo.isFullReading) ? (
+                  <>
+                    <div className="total-score-value">{scoreInfo.totalScore}</div>
+                    <div className="total-max">/ 990 Điểm</div>
+                  </>
+                ) : (
+                  <>
+                    <div className="total-score-value" style={{ fontSize: '32px' }}>
+                      {scoreInfo.correctL + scoreInfo.correctR}
+                    </div>
+                    <div className="total-max">/ {questions.length} câu đúng</div>
+                  </>
+                )}
 
                 <div style={{ width: '100%', height: '1px', background: '#e2e8f0', margin: '18px 0' }}></div>
 
@@ -304,7 +329,7 @@ const TakingExam = () => {
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span>🎯 Tỷ lệ chính xác:</span>
-                    <strong style={{ color: '#4f46e5' }}>{Math.round(((scoreInfo.correctL + scoreInfo.correctR) / questions.length) * 100)}%</strong>
+                    <strong style={{ color: '#4f46e5' }}>{questions.length > 0 ? Math.round(((scoreInfo.correctL + scoreInfo.correctR) / questions.length) * 100) : 0}%</strong>
                   </div>
                 </div>
               </div>
@@ -313,34 +338,44 @@ const TakingExam = () => {
               <div className="section-score-container">
 
                 {/* THẺ ĐIỂM LISTENING */}
-                <div className="section-score-card card-listening">
-                  <div>
-                    <h4>🎧 Phần thi Listening</h4>
-                    <div className="section-score-meta">
-                      <span style={{ color: '#16a34a', fontWeight: '700' }}>{scoreInfo.correctL} câu đúng</span>
-                      <span style={{ color: '#cbd5e1', margin: '0 8px' }}>|</span>
-                      <span style={{ color: '#ef4444', fontWeight: '700' }}>{scoreInfo.wrongL} câu sai/bỏ qua</span>
+                {scoreInfo.totalListening > 0 && (
+                  <div className="section-score-card card-listening">
+                    <div>
+                      <h4>🎧 Phần thi Listening</h4>
+                      <div className="section-score-meta">
+                        <span style={{ color: '#16a34a', fontWeight: '700' }}>{scoreInfo.correctL} câu đúng</span>
+                        <span style={{ color: '#cbd5e1', margin: '0 8px' }}>|</span>
+                        <span style={{ color: '#ef4444', fontWeight: '700' }}>{scoreInfo.wrongL} câu sai/bỏ qua</span>
+                      </div>
+                    </div>
+                    <div className="section-score-value">
+                      {scoreInfo.isFullListening
+                        ? <>{scoreInfo.scoreL} <span className="section-score-max">/ 495</span></>
+                        : <span style={{ fontSize: '14px', color: '#94a3b8' }}>{scoreInfo.correctL}/{scoreInfo.totalListening} câu</span>
+                      }
                     </div>
                   </div>
-                  <div className="section-score-value">
-                    {scoreInfo.scoreL} <span className="section-score-max">/ 495</span>
-                  </div>
-                </div>
+                )}
 
                 {/* THẺ ĐIỂM READING */}
-                <div className="section-score-card card-reading">
-                  <div>
-                    <h4>📖 Phần thi Reading</h4>
-                    <div className="section-score-meta">
-                      <span style={{ color: '#16a34a', fontWeight: '700' }}>{scoreInfo.correctR} câu đúng</span>
-                      <span style={{ color: '#cbd5e1', margin: '0 8px' }}>|</span>
-                      <span style={{ color: '#ef4444', fontWeight: '700' }}>{scoreInfo.wrongR} câu sai/bỏ qua</span>
+                {scoreInfo.totalReading > 0 && (
+                  <div className="section-score-card card-reading">
+                    <div>
+                      <h4>📖 Phần thi Reading</h4>
+                      <div className="section-score-meta">
+                        <span style={{ color: '#16a34a', fontWeight: '700' }}>{scoreInfo.correctR} câu đúng</span>
+                        <span style={{ color: '#cbd5e1', margin: '0 8px' }}>|</span>
+                        <span style={{ color: '#ef4444', fontWeight: '700' }}>{scoreInfo.wrongR} câu sai/bỏ qua</span>
+                      </div>
+                    </div>
+                    <div className="section-score-value">
+                      {scoreInfo.isFullReading
+                        ? <>{scoreInfo.scoreR} <span className="section-score-max">/ 495</span></>
+                        : <span style={{ fontSize: '14px', color: '#94a3b8' }}>{scoreInfo.correctR}/{scoreInfo.totalReading} câu</span>
+                      }
                     </div>
                   </div>
-                  <div className="section-score-value">
-                    {scoreInfo.scoreR} <span className="section-score-max">/ 495</span>
-                  </div>
-                </div>
+                )}
 
               </div>
             </div>
