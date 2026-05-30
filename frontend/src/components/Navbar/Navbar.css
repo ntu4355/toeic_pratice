@@ -1,4 +1,7 @@
 .navbar {
+  position: sticky;
+  top: 0;
+  z-index: 1200;
   padding: 18px 72px;
   display: flex;
   justify-content: space-between;
@@ -6,6 +9,7 @@
   background: linear-gradient(90deg, #0f4bcf 0%, #0f3f92 100%);
   border-radius: 0 0 28px 28px;
   box-shadow: 0 24px 60px rgba(15, 75, 207, 0.18);
+  backdrop-filter: blur(6px);
 }
 
 .logo {

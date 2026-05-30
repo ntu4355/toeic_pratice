@@ -47,8 +47,16 @@ const App = () => {
           setCurrentUser={setCurrentUser}
         />
         <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/vocab" element={<Vocab />} />
+          <Route path="/" element={<Home currentUser={currentUser} />} />
+          <Route
+            path="/vocab"
+            element={(
+              <Vocab
+                key={currentUser?.id || currentUser?._id || currentUser?.email || "guest"}
+                currentUser={currentUser}
+              />
+            )}
+          />
           <Route path="/exam" element={<Exam />} />
           <Route path="/create-exam" element={<CreateExam currentUser={currentUser} />} />
           <Route path="/admin" element={<AdminDashboard currentUser={currentUser} />} />

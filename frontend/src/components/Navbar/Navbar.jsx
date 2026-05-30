@@ -32,14 +32,12 @@ const Navbar = ({ setShowLogin, currentUser, setCurrentUser }) => {
           </Link>
         </li>
         <li>
-          <a
-            href="/vocab"
-            target="_blank"
-            rel="noopener noreferrer"
+          <Link
+            to="/vocab"
             className={location.pathname === "/vocab" ? "active" : ""}
           >
             Từ vựng
-          </a>
+          </Link>
         </li>
         <li>
           <Link
