@@ -13,6 +13,8 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import PDFParser from "pdf2json"; 
 
+dotenv.config();
+
 // ==========================================
 // CÔNG CỤ XỬ LÝ PDF (HIỆN ĐẠI & ỔN ĐỊNH 100%)
 // ==========================================
@@ -36,9 +38,6 @@ const parsePdfBuffer = (buffer) => {
         }
     });
 };
-// ==========================================
-
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -129,17 +128,18 @@ const rotateKey = (reason = "") => {
 
 const genAI = { getGenerativeModel: (...args) => getActiveKey().client.getGenerativeModel(...args) };
 
-const GEMINI_EXTRACT_MODEL = process.env.GEMINI_EXTRACT_MODEL || "gemini-2.0-flash";
-const GEMINI_KEY_MODEL     = process.env.GEMINI_KEY_MODEL     || "gemini-2.0-flash";
-const GEMINI_CLEANUP_MODEL = process.env.GEMINI_CLEANUP_MODEL || "gemini-2.0-flash";
+// 💡 ĐÃ GHIM CỨNG THÀNH 1.5-FLASH ĐỂ TRÁNH HẾT QUOTA, BẤT CHẤP FILE .ENV
+const GEMINI_EXTRACT_MODEL = "gemini-2.5-flash";
+const GEMINI_KEY_MODEL     = "gemini-2.5-flash";
+const GEMINI_CLEANUP_MODEL = "gemini-2.5-flash";
 console.log(`[Gemini] ✅ Đã tải ${geminiKeys.length} API key. Model đang dùng: ${GEMINI_EXTRACT_MODEL}`);
 
 const upload = multer({ dest: 'uploads/' });
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const POLITE_DELAY = 2500; // Tăng thời gian chờ lên một chút cho mượt
+// 💡 TĂNG ĐỘ TRỄ LÊN 3.5 GIÂY ĐỂ TRÁNH BỊ GOOGLE PHẠT SPAM
+const POLITE_DELAY = 3500;
 
-// 💡 Đã giảm giới hạn Chunk xuống 8000 để AI đọc kỹ hơn, không bị lười!
 const chunkText = (text, maxLength) => {
     const chunks = [];
     let currentChunk = "";
@@ -223,6 +223,7 @@ const getJsonModel = (modelName) => genAI.getGenerativeModel({
 const updateJob = async (jobId, patch) => {
     if (!jobId) return null;
     try {
+        // Đã sửa thành returnDocument để chặn Warning của Mongoose
         return await Job.findByIdAndUpdate(jobId, patch, { returnDocument: 'after' });
     } catch (error) {
         return null;
@@ -286,11 +287,13 @@ const normalizeKeyItem = (item) => {
         Explanation: cleanString(item?.Explanation)
     };
 };
+
 const normalizeQuestionItem = (item) => {
     const questionNo = toNumber(item?.QuestionNo);
     if (!questionNo || questionNo < 1 || questionNo > 200) return null;
 
-    const part = toNumber(item?.Part) || inferPartFromQuestionNo(questionNo);
+    // 💡 BỌC THÉP: Ép chuẩn Part theo đúng luật TOEIC, không tin tưởng AI
+    const part = inferPartFromQuestionNo(questionNo);
     if (!part) return null;
 
     return {
@@ -351,7 +354,7 @@ async function processKeyPdf(filePath, keyName) {
     const pdfData = await parsePdfBuffer(pdfBuffer);
     const fullText = pdfData.text || "";
 
-    const textChunks = chunkText(fullText, 8000); // Giảm chunk xuống để AI đỡ lười
+    const textChunks = chunkText(fullText, 8000); 
 
     for (let j = 0; j < textChunks.length; j++) {
         const chunk = textChunks[j];
@@ -415,10 +418,23 @@ async function processExamInBackground(pdfFiles, examName, duration, partsArray,
         console.log(`[Worker] Bắt đầu xử lý ĐỀ THI: ${examName}`);
         await updateJob(jobId, { status: 'processing', progress: 5, message: 'Đang vắt chữ từ file đáp án...' });
         
-        const [listeningKeys, readingKeys] = await Promise.all([
-            processKeyPdf(listeningKeyPath, "Listening"),
-            processKeyPdf(readingKeyPath, "Reading"),
-        ]);
+        // 💡 SỬA LỖI NÚT THẮT CỔ CHAI: Đọc đáp án NỐI TIẾP thay vì SONG SONG
+        let listeningKeys = {};
+        if (listeningKeyPath) {
+            console.log("[Key Parser] ⏳ Đang xử lý Đáp án Listening (Vui lòng chờ)...");
+            listeningKeys = await processKeyPdf(listeningKeyPath, "Listening");
+            console.log("[Key Parser] ✅ Xong Đáp án Listening! Nghỉ 3 giây cho Google nghỉ thở...");
+            await sleep(3000); 
+        }
+
+        let readingKeys = {};
+        if (readingKeyPath) {
+            console.log("[Key Parser] ⏳ Đang xử lý Đáp án Reading (Vui lòng chờ)...");
+            readingKeys = await processKeyPdf(readingKeyPath, "Reading");
+            console.log("[Key Parser] ✅ Xong Đáp án Reading! Nghỉ 3 giây...");
+            await sleep(3000);
+        }
+
         const allKeys = { ...listeningKeys, ...readingKeys };
         await updateJob(jobId, { progress: 25, message: 'Đã đọc đáp án, đang xử lý ảnh và audio...' });
 
@@ -494,7 +510,7 @@ async function processExamInBackground(pdfFiles, examName, duration, partsArray,
                 const pdfData = await parsePdfBuffer(pdfBuffer);
                 const fullText = pdfData.text || "";
 
-                const textChunks = chunkText(fullText, 8000); // 💡 Tối ưu chia nhỏ 8000 ký tự
+                const textChunks = chunkText(fullText, 8000); 
 
                 for (let j = 0; j < textChunks.length; j++) {
                     const chunk = textChunks[j];
@@ -510,7 +526,6 @@ async function processExamInBackground(pdfFiles, examName, duration, partsArray,
                         try {
                             const model = getJsonModel(GEMINI_EXTRACT_MODEL);
 
-                            // 💡 Lời nhắc (Prompt) được gò cực gắt để ép AI không được bỏ sót
                             const PROMPT_TOEIC = `Bạn là chuyên gia TOEIC. Nhiệm vụ của bạn là bóc tách TẤT CẢ các câu hỏi trắc nghiệm từ đoạn văn bản sau.
                             - Lấy CHUẨN XÁC số thứ tự câu hỏi (Ví dụ: 32., 101., 150.).
                             - Bỏ qua Part 1, 2. CHỈ TÌM và trích xuất các câu hỏi từ số 32 đến 200.
@@ -566,20 +581,34 @@ async function processExamInBackground(pdfFiles, examName, duration, partsArray,
                                                 Explanation: allKeys[q.QuestionNo]?.Explanation || ""      
                                             };
                                         });
-                                        finalQuestionsArray = [...finalQuestionsArray, ...processedQuestions];
+
+                                        // 💡 BỌC THÉP LỌC TRÙNG LẶP: Không cho phép AI đẻ ra 2 câu giống nhau
+                                        processedQuestions.forEach(newQ => {
+                                            const existingIdx = finalQuestionsArray.findIndex(q => q.QuestionNo === newQ.QuestionNo);
+                                            if (existingIdx !== -1) {
+                                                finalQuestionsArray[existingIdx] = { ...finalQuestionsArray[existingIdx], ...newQ };
+                                            } else {
+                                                finalQuestionsArray.push(newQ);
+                                            }
+                                        });
                                 }
                                 chunkSuccess = true; 
-                                console.log(`[Exam Parser] [V] Đã đóng gói xong Phần ${j+1}/${textChunks.length}. Thêm ${normalizedQuestions.length} câu.`);
+                                console.log(`[Exam Parser] [V] Đã đóng gói xong Phần ${j+1}/${textChunks.length}.`);
                             }
                         } catch (error) {
                             console.error(`[Exam Parser] ❌ Lỗi (Lần thử ${attempt}):`, error.message);
                             if (attempt < 3) await smartSleep(error, "Exam Parser");
                         }
                     } 
-                    if (j < textChunks.length - 1 || i < pdfFiles.length - 1) {
+                    if (j < textChunks.length - 1) {
                         await sleep(POLITE_DELAY);
                     }
                 }
+                
+                // 💡 NGHỈ 5S SAU KHI XONG MỖI FILE ĐỂ TRÁNH DỘI BOM GOOGLE
+                console.log(`[Exam Parser] ✅ Đã xong file PDF ${i + 1}. Nghỉ 5 giây trước khi tiếp tục...`);
+                await sleep(5000);
+
                 try { fs.unlinkSync(pdfFile.path); } catch(e){}
             }
         }
@@ -602,7 +631,7 @@ async function processExamInBackground(pdfFiles, examName, duration, partsArray,
 }
 
 // ==========================================
-// CÁC API POST / PUT / GET (GIỮ NGUYÊN HOÀN TOÀN)
+// CÁC API POST / PUT / GET
 // ==========================================
 app.post('/api/upload-exam', authenticate, requireAdmin, upload.any(), async (req, res) => {
     try {
@@ -769,11 +798,13 @@ app.put('/api/exams/:id/append-files', authenticate, requireAdmin, upload.any(),
                     await updateJob(job._id, { progress: 70, message: 'Đang đọc đáp án Listening bổ sung...' });
                     const keys = await processKeyPdf(listeningKeyFile.path, "Listening (Bổ sung)");
                     allKeys = { ...allKeys, ...keys };
+                    await sleep(3000);
                 }
                 if (readingKeyFile) {
                     await updateJob(job._id, { progress: 75, message: 'Đang đọc đáp án Reading bổ sung...' });
                     const keys = await processKeyPdf(readingKeyFile.path, "Reading (Bổ sung)");
                     allKeys = { ...allKeys, ...keys };
+                    await sleep(3000);
                 }
 
                 if (Object.keys(allKeys).length > 0) {
@@ -813,6 +844,7 @@ app.put('/api/exams/:id/append-files', authenticate, requireAdmin, upload.any(),
                     updatedQuestions = updatedQuestions.map(q => audioUrlMap[q.QuestionNo] ? { ...q, AudioUrl: audioUrlMap[q.QuestionNo] } : q);
                 }
 
+                // Chèn các câu Part 1 & 2 rỗng nếu thiếu
                 for (let k = 1; k <= 31; k++) {
                     if (!updatedQuestions.find(q => q.QuestionNo === k)) {
                         if (allKeys[k] || taskImageMap[`part1_image_${k}`]) {
