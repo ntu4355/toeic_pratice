@@ -263,20 +263,34 @@ const TakingExam = () => {
   const nextPart = currentPartIndex < availableParts.length - 1 ? availableParts[currentPartIndex + 1] : null;
 
   const passageGroups = [];
-  let currentImageKey = null;
+  let currentPassageKey = null;
   let currentGroup = [];
 
   displayedQuestions.forEach(q => {
-    const qImageKey = (q.PassageImages && q.PassageImages.length > 0) ? q.PassageImages.join("||") : `no_img_${q.QuestionNo}`;
-    if (qImageKey !== currentImageKey) {
-      if (currentGroup.length > 0) passageGroups.push({ images: currentGroup[0].PassageImages || [], questions: currentGroup });
-      currentImageKey = qImageKey;
+    const imageKey = (q.PassageImages && q.PassageImages.length > 0) ? q.PassageImages.join("||") : "";
+    const textKey = String(q.PassageText || "").trim();
+    const qPassageKey = imageKey || textKey || `no_passage_${q.QuestionNo}`;
+    if (qPassageKey !== currentPassageKey) {
+      if (currentGroup.length > 0) {
+        passageGroups.push({
+          images: currentGroup[0].PassageImages || [],
+          passageText: currentGroup[0].PassageText || "",
+          questions: currentGroup
+        });
+      }
+      currentPassageKey = qPassageKey;
       currentGroup = [q];
     } else {
       currentGroup.push(q);
     }
   });
-  if (currentGroup.length > 0) passageGroups.push({ images: currentGroup[0].PassageImages || [], questions: currentGroup });
+  if (currentGroup.length > 0) {
+    passageGroups.push({
+      images: currentGroup[0].PassageImages || [],
+      passageText: currentGroup[0].PassageText || "",
+      questions: currentGroup
+    });
+  }
 
   return (
     <div className="taking-exam-container">
@@ -405,6 +419,8 @@ const TakingExam = () => {
                   <div className="passage-images-gallery">
                     {group.images && group.images.length > 0 ? (
                       group.images.map((imgUrl, imgIdx) => <img key={imgIdx} src={imgUrl} alt={`Đoạn văn`} style={{ maxWidth: '100%' }} />)
+                    ) : group.passageText ? (
+                      <div className="passage-text-box">{group.passageText}</div>
                     ) : (
                       <div style={{ padding: '20px', background: '#fef2f2', color: '#991b1b', borderRadius: '8px', border: '1px dashed #fca5a5' }}>(Không tìm thấy dữ liệu ảnh bài đọc)</div>
                     )}

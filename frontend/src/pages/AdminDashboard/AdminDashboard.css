@@ -186,6 +186,40 @@
 .btn-edit { background: #f1f5f9; color: #334155; }
 .btn-delete { background: #fee2e2; color: #ef4444; }
 
+/* --- CONTACT / TICKETS --- */
+.contacts-list { display: flex; flex-direction: column; gap: 12px; }
+.contact-item { background: #ffffff; border: 1px solid #eef2ff; padding: 14px; border-radius: 10px; display: flex; flex-direction: column; gap: 10px; }
+.contact-item.unread { border-color: #fde68a; background: linear-gradient(180deg,#fffaf0, #ffffff); }
+.contact-item.read { border-color: #e2e8f0; }
+.contact-top { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+.contact-meta { flex: 1; }
+.contact-subject { color: #475569; font-weight: 700; margin-top: 6px; }
+.contact-message { margin-top: 8px; color: #334155; line-height: 1.45; }
+.contact-actions { display: flex; gap: 8px; align-items: center; }
+.contact-actions button { padding: 8px 10px; border-radius: 8px; border: none; cursor: pointer; font-weight: 700; }
+.btn-mark { background: #f1f5f9; color: #334155; }
+.btn-reply { background: #eef2ff; color: #2563eb; }
+.btn-resolve { background: #dcfce7; color: #15803d; }
+
+.contact-admin-reply { background: #f8fafc; border-left: 4px solid #667eea; padding: 10px 12px; border-radius: 8px; }
+.reply-label { font-weight: 800; color: #334155; margin-bottom: 6px; }
+.reply-body { color: #0f172a; }
+.reply-time { color: #64748b; font-size: 13px; margin-top: 6px; }
+
+.contact-reply-editor { display: flex; flex-direction: column; gap: 8px; }
+.reply-input { width: 100%; min-height: 80px; padding: 10px; border-radius: 8px; border: 1px solid #cbd5e1; resize: vertical; }
+.btn-reply-send { background: #667eea; color: white; padding: 8px 12px; border-radius: 8px; border: none; font-weight: 800; }
+
+/* Chat message thread */
+.contact-messages { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.chat-message { max-width: 78%; padding: 10px 12px; border-radius: 10px; position: relative; }
+.chat-user { background: #f1f5f9; align-self: flex-start; color: #0f172a; border: 1px solid #e6eefc; }
+.chat-admin { background: #e6f0ff; align-self: flex-end; color: #06266c; border: 1px solid #cfe0ff; }
+.chat-time { font-size: 12px; color: #64748b; margin-top: 6px; }
+.chat-text { white-space: pre-wrap; line-height: 1.45; }
+
+
+
 /* Modal */
 .modal-overlay { position: fixed; top:0; left:0; right:0; bottom:0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;}
 .modal-content { background: white; padding: 30px; border-radius: 12px; width: 400px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);}
